@@ -19,7 +19,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const allowedOrigins = ['https://admin-frontend-jet-eta.vercel.app/', 'http://localhost:3000'];
+const allowedOrigins = ['https://admin-frontend-jet-eta.vercel.app', 'http://localhost:3000'];
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -31,7 +31,7 @@ app.use(cors({
   },
   credentials: true,
 }));
-
+app.options('*', cors());
 
 app.use(helmet());
 app.use(morgan('dev'));
