@@ -303,16 +303,15 @@ const { recordTransfer } = require("../controllers/transfer.controller");
 
 exports.editUserBalance = async (req, res) => {
   try {
-    const { email, newBalance , admin} = req.body;
+    const { email, newBalance, admin } = req.body;
 
     if (!email || typeof newBalance !== "number" || newBalance <= 0) {
       return res.status(400).json({
         success: false,
-        message: "Invalid input: username and positive number required.",
+        message: "Invalid input: email and positive number required.",
       });
     }
 
-    // Case-insensitive username match
     const user = await User.findOne({
       email: new RegExp(`^${email}$`, "i"),
     });
@@ -326,7 +325,6 @@ exports.editUserBalance = async (req, res) => {
 
     const balanceBefore = user.balance || 0;
 
-    // Update user balance using $inc
     const updatedUser = await User.findByIdAndUpdate(
       user._id,
       { $inc: { balance: newBalance } },
@@ -335,15 +333,16 @@ exports.editUserBalance = async (req, res) => {
 
     const amountTransferred = newBalance;
 
-    // ✅ Record transfer in TransferHistory collection
     await recordTransfer({
       email: user.email,
       firebaseUid: user.firebaseUid,
       userName: user.name, // full name
       amount: amountTransferred,
-      adminName:admin,
+      adminName: admin,
     });
-    console.log("This is admin" , admin);
+
+    console.log(`[INFO] Admin "${admin}" updated balance of "${user.email}" by ${newBalance}`);
+
     return res.status(200).json({
       success: true,
       message: "Balance updated and transfer recorded.",
@@ -364,5 +363,6 @@ exports.editUserBalance = async (req, res) => {
     });
   }
 };
+
 
 
