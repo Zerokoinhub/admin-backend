@@ -19,10 +19,19 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+const allowedOrigins = ['https://admin.zerokoin.com','https://admin-frontend-jet-eta.vercel.app', 'http://localhost:3000'];
+
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
+app.options('*', cors());
 
 app.use(helmet());
 app.use(morgan('dev'));
@@ -42,7 +51,7 @@ app.use('/api/courses', courseRoutes);
 app.use('/api/pages', pageRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/transfers', transferRoutes); // ✅ ENABLED
+app.use('/api/transfer', transferRoutes); // ✅ ENABLED
 
 // Health check
 app.get('/health', (req, res) => {

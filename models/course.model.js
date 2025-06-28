@@ -9,7 +9,7 @@ const courseSchema = new mongoose.Schema({
             time: { type: Number, required: true }  
         }
     ],
-    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    uploadedBy: { type: String, required: true },
     isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 
