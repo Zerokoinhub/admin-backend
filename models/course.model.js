@@ -6,7 +6,7 @@ const courseSchema = new mongoose.Schema({
         {
             title: { type: String, required: true },
             content: { type: String, required: true },
-            time: { type: Number, required: true }  
+            time: { type: String, required: true }  
         }
     ],
     uploadedBy: { type: String, required: true },
