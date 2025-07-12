@@ -1,10 +1,11 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const axios = require('axios');
-const admobController = require('../controllers/admob.controller');
+const axios = require("axios");
+const admobController = require("../controllers/admob.controller");
+    const qs = require("querystring");
 
 // Step 1: OAuth Redirect URI route — GET /api/admob/oauth/callback
-router.get('/oauth/callback', async (req, res) => {
+router.get("/oauth/callback", async (req, res) => {
   const code = req.query.code;
 
   if (!code) {
@@ -13,16 +14,20 @@ router.get('/oauth/callback', async (req, res) => {
 
   try {
     // Exchange code for tokens (you can also move this logic to a controller if needed)
-    const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', null, {
-      params: {
+
+    const tokenResponse = await axios.post(
+      "https://oauth2.googleapis.com/token",
+      qs.stringify({
         code,
         client_id: process.env.AD_CLIENT_ID,
         client_secret: process.env.AD_CLIENT_SECRET,
         redirect_uri: process.env.AD_REDIRECT_URI,
-        grant_type: 'authorization_code',
-      },
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
+        grant_type: "authorization_code",
+      }),
+      {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      }
+    );
 
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
 
@@ -34,14 +39,16 @@ router.get('/oauth/callback', async (req, res) => {
       <p><strong>Expires In:</strong> ${expires_in} seconds</p>
       <p>Copy your refresh token and save it in your .env file as <code>AD_REFRESH_TOKEN=...</code></p>
     `);
-
   } catch (err) {
-    console.error("❌ Token exchange failed:", err.response?.data || err.message);
+    console.error(
+      "❌ Token exchange failed:",
+      err.response?.data || err.message
+    );
     return res.status(500).send("❌ Failed to exchange code for tokens.");
   }
 });
 
 // Step 2: Fetch AdMob Report — GET /api/admob/report
-router.get('/report', admobController.getAdmobReport);
+router.get("/report", admobController.getAdmobReport);
 
 module.exports = router;

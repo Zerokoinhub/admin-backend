@@ -20,7 +20,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const allowedOrigins = ['https://admin.zerokoin.com','https://admin-frontend-jet-eta.vercel.app', 'http://localhost:3000'];
+const allowedOrigins = ['https://admin.zerokoin.com','https://admin-frontend-jet-eta.vercel.app', 'http://localhost:3000','https://admin.zerokoin.com/api/admob/oauth/callback'];
 
 app.use(cors({
   origin: function (origin, callback) {
