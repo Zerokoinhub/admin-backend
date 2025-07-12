@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 const admobController = require("../controllers/admob.controller");
-    const qs = require("querystring");
+const qs = require("querystring");
 
 // Step 1: OAuth Redirect URI route — GET /api/admob/oauth/callback
 router.get("/oauth/callback", async (req, res) => {
@@ -44,6 +44,10 @@ router.get("/oauth/callback", async (req, res) => {
       "❌ Token exchange failed:",
       err.response?.data || err.message
     );
+    return res.status(500).send(`
+  <h2>❌ Failed to exchange code for tokens.</h2>
+  <pre>${JSON.stringify(err.response?.data || err.message, null, 2)}</pre>
+`);
     return res.status(500).send("❌ Failed to exchange code for tokens.");
   }
 });
