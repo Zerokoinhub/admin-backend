@@ -1,5 +1,6 @@
 const Admin = require('../models/admin.model');
 const jwt = require('jsonwebtoken');
+const bcrypt = require("bcryptjs"); // required if password hashing is used
 
 const generateToken = (adminId) => {
     return jwt.sign({ id: adminId }, process.env.JWT_SECRET || 'your-secret-key', {
@@ -105,15 +106,35 @@ exports.getAdmins = async (req, res) => {
 
 // Edit admin
 exports.editAdmin = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { username, email, role } = req.body;
-        const admin = await Admin.findByIdAndUpdate(id, { username, email, role }, { new: true }).select('-password');
-        if (!admin) return res.status(404).json({ success: false, message: 'Admin not found' });
-        res.json({ success: true, admin });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Error editing admin', error: error.message });
+  try {
+    const { id } = req.params;
+    const { username, email, role, password } = req.body;
+
+    const admin = await Admin.findById(id);
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin not found" });
     }
+
+    // ✅ Update fields if provided
+    if (username) admin.username = username;
+    if (email) admin.email = email;
+    if (role) admin.role = role;
+
+    // ✅ Only assign password (hashing will be handled by pre-save hook)
+    if (password?.trim()) {
+      admin.password = password.trim();
+    }
+
+    // ✅ Save admin and trigger pre-save hook for hashing
+    await admin.save();
+
+    // ✅ Return admin object without password
+    const { password: _, ...adminData } = admin.toObject();
+    res.json({ success: true, admin: adminData });
+
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error editing admin", error: error.message });
+  }
 };
 
 // Delete admin

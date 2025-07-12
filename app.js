@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 require('dotenv').config();
 
+const admobRoutes = require('./routes/admob.routes');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const courseRoutes = require('./routes/course.routes');
@@ -52,6 +53,7 @@ app.use('/api/pages', pageRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/transfer', transferRoutes); // ✅ ENABLED
+app.use('/api/admob', admobRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

@@ -22,16 +22,17 @@ const adminSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['superadmin', 'editor' , 'viewer'],
+        enum: ['superadmin', 'editor', 'viewer'],
         default: 'viewer'
     }
 }, {
     timestamps: true
 });
 
-// Hash password before saving
-adminSchema.pre('save', async function(next) {
-    if (!this.isModified('password')) return next();
+// ✅ Hash password before saving only if it is modified
+adminSchema.pre('save', async function (next) {
+    if (!this.isModified('password')) return next(); // Avoid double hashing
+
     try {
         const salt = await bcrypt.genSalt(10);
         this.password = await bcrypt.hash(this.password, salt);
@@ -41,11 +42,11 @@ adminSchema.pre('save', async function(next) {
     }
 });
 
-// Method to compare password
-adminSchema.methods.comparePassword = async function(candidatePassword) {
+// ✅ Method to compare entered password with hashed password in DB
+adminSchema.methods.comparePassword = async function (candidatePassword) {
     return bcrypt.compare(candidatePassword, this.password);
 };
 
 const Admin = mongoose.model('Admin', adminSchema);
 
-module.exports = Admin; 
+module.exports = Admin;

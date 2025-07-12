@@ -1,5 +1,6 @@
 const User = require("../models/user.model")
 const { validationResult } = require("express-validator")
+//const { recordTransfer } = require("./transfer.controller"); // adjust path if different
 
 const CACHE_DURATION = 300
 const cache = new Map()
@@ -354,36 +355,52 @@ const getTotalCalculatorUsage = async (req, res) => {
 }
 
 // Edit user balance (original function)
+const { recordTransfer } = require("./transfer.controller"); // ✅ Add this at the top
+
 const editUserBalance = async (req, res) => {
   try {
-    const { email, newBalance, admin } = req.body
+    const { email, newBalance, admin } = req.body;
 
     if (!email || typeof newBalance !== "number" || newBalance <= 0) {
       return res.status(400).json({
         success: false,
         message: "Invalid input: email and positive number required.",
-      })
+      });
     }
 
     const user = await User.findOne({
       email: new RegExp(`^${email}$`, "i"),
-    })
+    });
 
     if (!user) {
       return res.status(404).json({
         success: false,
         message: "User not found.",
-      })
+      });
     }
 
-    const balanceBefore = user.balance || 0
-    const newTotalBalance = balanceBefore + newBalance
+    const balanceBefore = user.balance || 0;
+    const newTotalBalance = balanceBefore + newBalance;
 
-    const updatedUser = await User.findByIdAndUpdate(user._id, { balance: newTotalBalance }, { new: true })
+    const updatedUser = await User.findByIdAndUpdate(
+      user._id,
+      { balance: newTotalBalance },
+      { new: true }
+    );
 
-    console.log(`[INFO] Admin "${admin}" updated balance of "${user.email}" by ${newBalance}`)
+    // ✅ Record the transfer
+    await recordTransfer({
+      email: user.email,
+      userName: user.name,
+      amount: newBalance,
+      adminName: admin || "System",
+    });
 
-    cache.clear()
+    console.log(
+      `[INFO] Admin "${admin}" updated balance of "${user.email}" by ${newBalance}`
+    );
+
+    cache.clear();
 
     return res.status(200).json({
       success: true,
@@ -395,16 +412,17 @@ const editUserBalance = async (req, res) => {
         amountChanged: newBalance,
         timestamp: new Date(),
       },
-    })
+    });
   } catch (error) {
-    console.error("editUserBalance error:", error)
+    console.error("editUserBalance error:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to update user balance.",
       error: error.message,
-    })
+    });
   }
-}
+};
+
 
 // Update profile (for current user)
 const updateProfile = async (req, res) => {
