@@ -1,6 +1,6 @@
 const User = require("../models/user.model")
 const { validationResult } = require("express-validator")
-//const { recordTransfer } = require("./transfer.controller"); // adjust path if different
+const { recordTransfer } = require("./transfer.controller")
 
 const CACHE_DURATION = 300
 const cache = new Map()
@@ -20,8 +20,10 @@ const getUsers = async (req, res) => {
     const search = req.query.search || ""
     const role = req.query.role
     const isActive = req.query.isActive
+    const country = req.query.country
+    const walletStatus = req.query.walletStatus
 
-    const cacheKey = `users_${page}_${limit}_${sortBy}_${sortOrder}_${search}_${role}_${isActive}`
+    const cacheKey = `users_${page}_${limit}_${sortBy}_${sortOrder}_${search}_${role}_${isActive}_${country}_${walletStatus}`
 
     if (cache.has(cacheKey)) {
       const cachedData = cache.get(cacheKey)
@@ -41,13 +43,10 @@ const getUsers = async (req, res) => {
       ]
     }
 
-    if (role) {
-      query.role = role
-    }
-
-    if (isActive !== undefined) {
-      query.isActive = isActive === "true"
-    }
+    if (role) query.role = role
+    if (isActive !== undefined) query.isActive = isActive === "true"
+    if (country) query.country = { $regex: country, $options: "i" }
+    if (walletStatus) query.walletStatus = walletStatus
 
     const skip = (page - 1) * limit
     const [users, total] = await Promise.all([
@@ -127,25 +126,37 @@ const updateUser = async (req, res) => {
       "inviteCode",
       "referredBy",
       "walletAddresses",
+      "walletStatus",
+      "country",
+      "notificationSettings",
+      "recentAmount",
+      "screenshots",
     ]
 
     const updateObject = {}
-
     allowedFields.forEach((field) => {
       if (updateData.hasOwnProperty(field)) {
         updateObject[field] = updateData[field]
       }
     })
 
-    // Handle nested walletAddresses
+    // Handle nested objects
     if (updateData.walletAddresses) {
       updateObject.walletAddresses = {
-        metamask: updateData.walletAddresses.metamask || currentUser.walletAddresses?.metamask || "",
-        trustWallet: updateData.walletAddresses.trustWallet || currentUser.walletAddresses?.trustWallet || "",
+        metamask: updateData.walletAddresses.metamask || currentUser.walletAddresses?.metamask || null,
+        trustWallet: updateData.walletAddresses.trustWallet || currentUser.walletAddresses?.trustWallet || null,
       }
     }
 
-    // Update the user
+    if (updateData.notificationSettings) {
+      updateObject.notificationSettings = {
+        sessionUnlocked:
+          updateData.notificationSettings.sessionUnlocked ?? currentUser.notificationSettings?.sessionUnlocked ?? true,
+        pushEnabled:
+          updateData.notificationSettings.pushEnabled ?? currentUser.notificationSettings?.pushEnabled ?? true,
+      }
+    }
+
     const updatedUser = await User.findByIdAndUpdate(id, updateObject, {
       new: true,
       runValidators: true,
@@ -158,7 +169,6 @@ const updateUser = async (req, res) => {
       })
     }
 
-    // Clear cache
     cache.clear()
 
     res.json({
@@ -169,7 +179,6 @@ const updateUser = async (req, res) => {
     })
   } catch (error) {
     console.error("Error in updateUser:", error)
-
     if (error.name === "ValidationError") {
       const validationErrors = Object.values(error.errors).map((err) => err.message)
       return res.status(400).json({
@@ -195,7 +204,329 @@ const updateUser = async (req, res) => {
   }
 }
 
-// Get total referrals
+// Session Management
+const updateUserSession = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { sessionNumber, action } = req.body
+
+    if (!sessionNumber || !action) {
+      return res.status(400).json({
+        success: false,
+        message: "Session number and action are required",
+      })
+    }
+
+    const user = await User.findById(id)
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      })
+    }
+
+    const sessionIndex = user.sessions.findIndex((s) => s.sessionNumber === sessionNumber)
+    if (sessionIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Session not found",
+      })
+    }
+
+    const session = user.sessions[sessionIndex]
+
+    switch (action) {
+      case "unlock":
+        session.unlockedAt = new Date()
+        session.isLocked = false
+        break
+      case "complete":
+        session.completedAt = new Date()
+        break
+      case "claim":
+        session.isClaimed = true
+        break
+      case "lock":
+        session.isLocked = true
+        break
+      default:
+        return res.status(400).json({
+          success: false,
+          message: "Invalid action",
+        })
+    }
+
+    await user.save()
+    cache.clear()
+
+    res.json({
+      success: true,
+      message: `Session ${sessionNumber} ${action}ed successfully`,
+      session: session,
+    })
+  } catch (error) {
+    console.error("Error in updateUserSession:", error)
+    res.status(500).json({
+      success: false,
+      message: "Error updating session",
+      error: error.message,
+    })
+  }
+}
+
+// Get user sessions
+const getUserSessions = async (req, res) => {
+  try {
+    const { id } = req.params
+    const user = await User.findById(id).select("sessions")
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      })
+    }
+
+    res.json({
+      success: true,
+      sessions: user.sessions,
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching sessions",
+      error: error.message,
+    })
+  }
+}
+
+// Update notification settings
+const updateNotificationSettings = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { sessionUnlocked, pushEnabled } = req.body
+
+    const updateObject = {}
+    if (sessionUnlocked !== undefined) updateObject["notificationSettings.sessionUnlocked"] = sessionUnlocked
+    if (pushEnabled !== undefined) updateObject["notificationSettings.pushEnabled"] = pushEnabled
+
+    const user = await User.findByIdAndUpdate(id, updateObject, { new: true }).select("-password")
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      })
+    }
+
+    cache.clear()
+
+    res.json({
+      success: true,
+      message: "Notification settings updated successfully",
+      notificationSettings: user.notificationSettings,
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error updating notification settings",
+      error: error.message,
+    })
+  }
+}
+
+// Add FCM token
+const addFcmToken = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { token } = req.body
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "FCM token is required",
+      })
+    }
+
+    const user = await User.findById(id)
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      })
+    }
+
+    // Add token if it doesn't exist
+    if (!user.fcmTokens.includes(token)) {
+      user.fcmTokens.push(token)
+      await user.save()
+    }
+
+    cache.clear()
+
+    res.json({
+      success: true,
+      message: "FCM token added successfully",
+      fcmTokens: user.fcmTokens,
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error adding FCM token",
+      error: error.message,
+    })
+  }
+}
+
+// Remove FCM token
+const removeFcmToken = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { token } = req.body
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "FCM token is required",
+      })
+    }
+
+    const user = await User.findById(id)
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      })
+    }
+
+    user.fcmTokens = user.fcmTokens.filter((t) => t !== token)
+    await user.save()
+
+    cache.clear()
+
+    res.json({
+      success: true,
+      message: "FCM token removed successfully",
+      fcmTokens: user.fcmTokens,
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error removing FCM token",
+      error: error.message,
+    })
+  }
+}
+
+// Add screenshot
+const addScreenshot = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { screenshot } = req.body
+
+    if (!screenshot) {
+      return res.status(400).json({
+        success: false,
+        message: "Screenshot data is required",
+      })
+    }
+
+    const user = await User.findById(id)
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      })
+    }
+
+    user.screenshots.push({
+      ...screenshot,
+      uploadedAt: new Date(),
+    })
+    await user.save()
+
+    cache.clear()
+
+    res.json({
+      success: true,
+      message: "Screenshot added successfully",
+      screenshots: user.screenshots,
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error adding screenshot",
+      error: error.message,
+    })
+  }
+}
+
+// Get user statistics
+const getUserStats = async (req, res) => {
+  try {
+    const stats = await User.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalUsers: { $sum: 1 },
+          totalBalance: { $sum: "$balance" },
+          totalReferrals: {
+            $sum: {
+              $cond: [{ $ne: ["$referredBy", null] }, 1, 0],
+            },
+          },
+          totalCalculatorUsage: { $sum: "$calculatorUsage" },
+          connectedWallets: {
+            $sum: {
+              $cond: [
+                {
+                  $or: [
+                    {
+                      $and: [{ $ne: ["$walletAddresses.metamask", null] }, { $ne: ["$walletAddresses.metamask", ""] }],
+                    },
+                    {
+                      $and: [
+                        { $ne: ["$walletAddresses.trustWallet", null] },
+                        { $ne: ["$walletAddresses.trustWallet", ""] },
+                      ],
+                    },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          activeUsers: {
+            $sum: {
+              $cond: [{ $eq: ["$isActive", true] }, 1, 0],
+            },
+          },
+        },
+      },
+    ])
+
+    const countryStats = await User.aggregate([
+      { $group: { _id: "$country", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
+    ])
+
+    res.json({
+      success: true,
+      stats: stats[0] || {},
+      countryStats,
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching user statistics",
+      error: error.message,
+    })
+  }
+}
+
+// Existing functions (keeping all the original ones)
 const getTotalReferrals = async (req, res) => {
   try {
     const totalReferrals = await User.countDocuments({
@@ -211,7 +542,6 @@ const getTotalReferrals = async (req, res) => {
   }
 }
 
-// Ban user
 const banUser = async (req, res) => {
   try {
     const { id } = req.params
@@ -219,7 +549,6 @@ const banUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" })
     }
-
     cache.clear()
     res.json({ success: true, message: "User banned", user })
   } catch (error) {
@@ -231,7 +560,6 @@ const banUser = async (req, res) => {
   }
 }
 
-// Unban user
 const unbanUser = async (req, res) => {
   try {
     const { id } = req.params
@@ -239,7 +567,6 @@ const unbanUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" })
     }
-
     cache.clear()
     res.json({ success: true, message: "User unbanned", user })
   } catch (error) {
@@ -251,7 +578,6 @@ const unbanUser = async (req, res) => {
   }
 }
 
-// Manual coin transfer
 const manualCoinTransfer = async (req, res) => {
   try {
     const { id } = req.params
@@ -274,6 +600,7 @@ const manualCoinTransfer = async (req, res) => {
 
     const previousBalance = user.balance || 0
     user.balance = previousBalance + amount
+    user.recentAmount = amount
     await user.save()
 
     cache.clear()
@@ -286,6 +613,7 @@ const manualCoinTransfer = async (req, res) => {
         previousBalance,
         newBalance: user.balance,
         amountTransferred: amount,
+        reason,
         timestamp: new Date(),
       },
     })
@@ -298,7 +626,6 @@ const manualCoinTransfer = async (req, res) => {
   }
 }
 
-// Get total connected wallets
 const getTotalConnectedWallets = async (req, res) => {
   try {
     const totalWallets = await User.countDocuments({
@@ -317,7 +644,6 @@ const getTotalConnectedWallets = async (req, res) => {
   }
 }
 
-// Get calculator users
 const getCalculatorUsers = async (req, res) => {
   try {
     const users = await User.find({ calculatorUsage: { $gt: 0 } })
@@ -331,7 +657,6 @@ const getCalculatorUsers = async (req, res) => {
   }
 }
 
-// Get total calculator usage
 const getTotalCalculatorUsage = async (req, res) => {
   try {
     const result = await User.aggregate([
@@ -342,7 +667,6 @@ const getTotalCalculatorUsage = async (req, res) => {
         },
       },
     ])
-
     const totalCalculatorUsage = result[0]?.totalCalculatorUsage || 0
     res.json({ success: true, totalCalculatorUsage })
   } catch (error) {
@@ -354,53 +678,47 @@ const getTotalCalculatorUsage = async (req, res) => {
   }
 }
 
-// Edit user balance (original function)
-const { recordTransfer } = require("./transfer.controller"); // ✅ Add this at the top
-
 const editUserBalance = async (req, res) => {
   try {
-    const { email, newBalance, admin } = req.body;
-
+    const { email, newBalance, admin } = req.body
     if (!email || typeof newBalance !== "number" || newBalance <= 0) {
       return res.status(400).json({
         success: false,
         message: "Invalid input: email and positive number required.",
-      });
+      })
     }
 
     const user = await User.findOne({
       email: new RegExp(`^${email}$`, "i"),
-    });
-
+    })
     if (!user) {
       return res.status(404).json({
         success: false,
         message: "User not found.",
-      });
+      })
     }
 
-    const balanceBefore = user.balance || 0;
-    const newTotalBalance = balanceBefore + newBalance;
-
+    const balanceBefore = user.balance || 0
+    const newTotalBalance = balanceBefore + newBalance
     const updatedUser = await User.findByIdAndUpdate(
       user._id,
-      { balance: newTotalBalance },
-      { new: true }
-    );
+      {
+        balance: newTotalBalance,
+        recentAmount: newBalance,
+      },
+      { new: true },
+    )
 
-    // ✅ Record the transfer
     await recordTransfer({
       email: user.email,
       userName: user.name,
       amount: newBalance,
       adminName: admin || "System",
-    });
+    })
 
-    console.log(
-      `[INFO] Admin "${admin}" updated balance of "${user.email}" by ${newBalance}`
-    );
+    console.log(`[INFO] Admin "${admin}" updated balance of "${user.email}" by ${newBalance}`)
 
-    cache.clear();
+    cache.clear()
 
     return res.status(200).json({
       success: true,
@@ -412,24 +730,21 @@ const editUserBalance = async (req, res) => {
         amountChanged: newBalance,
         timestamp: new Date(),
       },
-    });
+    })
   } catch (error) {
-    console.error("editUserBalance error:", error);
+    console.error("editUserBalance error:", error)
     return res.status(500).json({
       success: false,
       message: "Failed to update user balance.",
       error: error.message,
-    });
+    })
   }
-};
+}
 
-
-// Update profile (for current user)
 const updateProfile = async (req, res) => {
   try {
-    const allowedUpdates = ["name", "username", "email"]
+    const allowedUpdates = ["name", "username", "email", "country", "notificationSettings"]
     const updates = {}
-
     allowedUpdates.forEach((field) => {
       if (req.body[field]) {
         updates[field] = req.body[field]
@@ -463,7 +778,6 @@ const updateProfile = async (req, res) => {
   }
 }
 
-// Get profile (for current user)
 const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select("-password")
@@ -477,7 +791,6 @@ const getProfile = async (req, res) => {
   }
 }
 
-// Change password
 const changePassword = async (req, res) => {
   try {
     const userId = req.user._id
@@ -519,10 +832,16 @@ const changePassword = async (req, res) => {
   }
 }
 
-// Export all functions
 module.exports = {
   getUsers,
   updateUser,
+  updateUserSession,
+  getUserSessions,
+  updateNotificationSettings,
+  addFcmToken,
+  removeFcmToken,
+  addScreenshot,
+  getUserStats,
   getTotalReferrals,
   banUser,
   unbanUser,
