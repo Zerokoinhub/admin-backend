@@ -418,6 +418,27 @@ const removeFcmToken = async (req, res) => {
   }
 }
 
+//GET Screenshots
+ const getUserScreenshots = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Find user and only select the screenshots field
+    const user = await User.findById(userId).select("screenshots");
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      screenshots: user.screenshots || [],
+    });
+  } catch (error) {
+    console.error("Error fetching screenshots:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 // Add screenshot
 const addScreenshot = async (req, res) => {
   try {
@@ -840,6 +861,7 @@ module.exports = {
   updateNotificationSettings,
   addFcmToken,
   removeFcmToken,
+  getUserScreenshots,
   addScreenshot,
   getUserStats,
   getTotalReferrals,

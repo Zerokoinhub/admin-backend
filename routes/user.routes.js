@@ -78,7 +78,10 @@ router.post("/:id/fcm-token", validateFcmToken, userController.addFcmToken)
 // Remove FCM token
 router.delete("/:id/fcm-token", validateFcmToken, userController.removeFcmToken)
 
-// ===== SCREENSHOT MANAGEMENT =====
+// ===== SCREENSHOT MANAGEMENT =====x
+
+//GET Screenshot
+router.get("/:userId/screenshots", userController.getUserScreenshots);
 
 // Add screenshot
 router.post("/:id/screenshots", validateScreenshot, userController.addScreenshot)

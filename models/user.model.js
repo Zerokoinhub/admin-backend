@@ -52,7 +52,12 @@ const userSchema = new mongoose.Schema({
     },
     walletAddresses: {
         // ... your existing code ...
-    }
+    },
+    screenshots: {
+    type: [String], // array of URLs
+    default: []
+},
+
 }, {
     timestamps: true
 });

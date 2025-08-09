@@ -141,36 +141,41 @@
 
 
 
-
 const Notification = require("../models/notification.model")
 const User = require("../models/user.model")
 
 const notificationService = {
-  send: async (userId, title, message, imageUrl) => {
-    console.log(`Sending notification to user ${userId}: '${title}' - '${message}' - Image: ${imageUrl}`)
+  send: async (userId, title, message, imageUrl, link) => {
+    console.log(
+      `Sending notification to user ${userId}: '${title}' - '${message}' - Image: ${imageUrl} - Link: ${link}`
+    )
     return Promise.resolve()
   },
 
-  sendToAll: async (title, message, imageUrl) => {
-    console.log(`Sending general notification to all users: '${title}' - '${message}' - Image: ${imageUrl}`)
+  sendToAll: async (title, message, imageUrl, link) => {
+    console.log(
+      `Sending general notification to all users: '${title}' - '${message}' - Image: ${imageUrl} - Link: ${link}`
+    )
     return Promise.resolve()
   },
 }
 
+// Send notification to all users
 exports.sendGeneralNotification = async (req, res) => {
   try {
-    const { title, message, imageUrl, priority = "old-user" } = req.body
+    const { title, message, imageUrl, link, priority = "old-user" } = req.body
 
     const notification = new Notification({
       title,
       message,
       imageUrl,
+      link,
       type: "general",
       priority,
     })
 
     await notification.save()
-    await notificationService.sendToAll(title, message, imageUrl)
+    await notificationService.sendToAll(title, message, imageUrl, link)
 
     res.status(200).json({ success: true, message: "General notification sent successfully." })
   } catch (error) {
@@ -178,9 +183,10 @@ exports.sendGeneralNotification = async (req, res) => {
   }
 }
 
+// Send notification to top users
 exports.sendTopUsersNotification = async (req, res) => {
   try {
-    const { title, message, imageUrl, limit = 10, priority = "top-rated-user" } = req.body
+    const { title, message, imageUrl, link, limit = 10, priority = "top-rated-user" } = req.body
 
     const topUsers = await User.find().sort({ points: -1 }).limit(limit)
 
@@ -193,12 +199,16 @@ exports.sendTopUsersNotification = async (req, res) => {
         title,
         message,
         imageUrl,
+        link,
         type: "top-users",
         priority,
         recipient: user._id,
       })
 
-      return Promise.all([notification.save(), notificationService.send(user._id, title, message, imageUrl)])
+      return Promise.all([
+        notification.save(),
+        notificationService.send(user._id, title, message, imageUrl, link),
+      ])
     })
 
     await Promise.all(notificationPromises)
@@ -209,9 +219,10 @@ exports.sendTopUsersNotification = async (req, res) => {
   }
 }
 
+// Send notification to single user
 exports.sendSingleUserNotification = async (req, res) => {
   try {
-    const { title, message, imageUrl, firebaseUid, priority = "old-user" } = req.body
+    const { title, message, imageUrl, link, firebaseUid, priority = "old-user" } = req.body
 
     const user = await User.findOne({ firebaseUid })
 
@@ -223,13 +234,14 @@ exports.sendSingleUserNotification = async (req, res) => {
       title,
       message,
       imageUrl,
+      link,
       type: "single-user",
       priority,
       recipient: user._id,
     })
 
     await notification.save()
-    await notificationService.send(user._id, title, message, imageUrl)
+    await notificationService.send(user._id, title, message, imageUrl, link)
 
     res.status(200).json({ success: true, message: "Notification sent to the user successfully." })
   } catch (error) {
@@ -237,9 +249,10 @@ exports.sendSingleUserNotification = async (req, res) => {
   }
 }
 
+// Send general notification with image upload
 exports.sendGeneralNotificationWithImage = async (req, res) => {
   try {
-    const { title, message, priority = "old-user" } = req.body
+    const { title, message, link, priority = "old-user" } = req.body
     const imageUrl = req.file ? req.file.path : null
 
     if (!title || !message) {
@@ -250,12 +263,13 @@ exports.sendGeneralNotificationWithImage = async (req, res) => {
       title,
       message,
       imageUrl,
+      link,
       type: "general",
       priority,
     })
 
     await notification.save()
-    await notificationService.sendToAll(title, message, imageUrl)
+    await notificationService.sendToAll(title, message, imageUrl, link)
 
     res.status(200).json({
       success: true,
@@ -264,6 +278,7 @@ exports.sendGeneralNotificationWithImage = async (req, res) => {
         title,
         message,
         imageUrl,
+        link,
         priority,
       },
     })
@@ -272,7 +287,7 @@ exports.sendGeneralNotificationWithImage = async (req, res) => {
   }
 }
 
-// GET API to retrieve notifications
+// Get paginated notifications
 exports.getNotifications = async (req, res) => {
   try {
     const { page = 1, limit = 10, type, priority } = req.query
@@ -310,7 +325,7 @@ exports.getNotifications = async (req, res) => {
   }
 }
 
-// GET API to retrieve single notification by ID
+// Get single notification by ID
 exports.getNotificationById = async (req, res) => {
   try {
     const { id } = req.params
