@@ -13,6 +13,9 @@ const pageRoutes = require('./routes/page.routes');
 const adminRoutes = require('./routes/admin.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const transferRoutes = require('./routes/transfer.routes'); // ✅ NOW UNCOMMENTED
+const withdrawalRoutes = require('./routes/withdrawal.routes');
+
+
 
 const app = express();
 
@@ -20,7 +23,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const allowedOrigins = ['https://admin.zerokoin.com','https://admin-frontend-jet-eta.vercel.app', 'http://localhost:3000','http://localhost:3001','https://admin.zerokoin.com/api/admob/oauth/callback'];
+const allowedOrigins = ['https://admin.zerokoin.com', 'https://admin-frontend-jet-eta.vercel.app', 'http://localhost:3000', 'http://localhost:3001', 'https://admin.zerokoin.com/api/admob/oauth/callback'];
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -54,6 +57,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/transfer', transferRoutes); // ✅ ENABLED
 app.use('/api/admob', admobRoutes);
+app.use('/api/withdrawals', withdrawalRoutes);
+
 
 // Health check
 app.get('/health', (req, res) => {
@@ -75,7 +80,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
 });
