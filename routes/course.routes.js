@@ -1,18 +1,18 @@
+// routes/course.routes.js
 const express = require('express');
 const courseController = require('../controllers/course.controller');
 
 const router = express.Router();
 
-// Get all courses
+// Basic CRUD
 router.get('/', courseController.getCourses);
-
-// Upload course
+router.get('/:id', courseController.getCourseById);
 router.post('/', courseController.uploadCourse);
-
-// Edit course
 router.put('/:id', courseController.editCourse);
-
-// Delete course
 router.delete('/:id', courseController.deleteCourse);
 
-module.exports = router; 
+// Language-specific endpoints (for Flutter app)
+router.get('/language/:language', courseController.getCoursesByLanguage);
+router.get('/languages/available', courseController.getAvailableLanguages);
+
+module.exports = router;
