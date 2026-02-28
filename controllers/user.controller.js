@@ -852,8 +852,215 @@ const changePassword = async (req, res) => {
     })
   }
 }
+// Get top 10 users by balance for leaderboard
+const getTopBalanceUsers = async (req, res) => {
+  try {
+    const cacheKey = 'top_balance_users_10'
+    
+    // Check cache first
+    if (cache.has(cacheKey)) {
+      const cachedData = cache.get(cacheKey)
+      if (Date.now() - cachedData.timestamp < CACHE_DURATION * 1000) {
+        console.log('✅ Returning cached leaderboard data')
+        return res.json({
+          success: true,
+          data: cachedData.data,
+          fromCache: true
+        })
+      }
+      cache.delete(cacheKey)
+    }
 
+    // Get top 10 users by balance (descending order)
+    const topUsers = await User.find({ 
+      isActive: true, // Only active users
+      balance: { $gt: 0 } // Only users with positive balance
+    })
+    .select('name username email balance profilePicture country') // Select only needed fields
+    .sort({ balance: -1 }) // Sort by balance descending
+    .limit(10)
+    .lean()
+
+    // Format the data for frontend
+    const formattedUsers = topUsers.map((user, index) => ({
+      rank: index + 1,
+      id: user._id,
+      name: user.name || user.username || 'Anonymous User',
+      email: user.email,
+      balance: user.balance || 0,
+      profilePicture: user.profilePicture || null,
+      country: user.country || 'Unknown',
+      username: user.username || '',
+    }))
+
+    // Get total count of users with balance > 0 (for stats)
+    const totalActiveUsers = await User.countDocuments({ 
+      isActive: true,
+      balance: { $gt: 0 }
+    })
+
+    // Get average balance
+    const avgBalanceResult = await User.aggregate([
+      { $match: { isActive: true, balance: { $gt: 0 } } },
+      { $group: { _id: null, avgBalance: { $avg: "$balance" } } }
+    ])
+    const avgBalance = avgBalanceResult[0]?.avgBalance || 0
+
+    const responseData = {
+      topUsers: formattedUsers,
+      stats: {
+        totalUsersWithBalance: totalActiveUsers,
+        averageBalance: Math.round(avgBalance * 100) / 100,
+        highestBalance: formattedUsers[0]?.balance || 0,
+        lastUpdated: new Date().toISOString()
+      }
+    }
+
+    // Store in cache
+    cache.set(cacheKey, {
+      data: responseData,
+      timestamp: Date.now()
+    })
+
+    console.log('✅ Top 10 users by balance fetched successfully')
+    res.json({
+      success: true,
+      data: responseData,
+      fromCache: false
+    })
+
+  } catch (error) {
+    console.error('❌ Error in getTopBalanceUsers:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching top balance users',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
+  }
+}
+
+// Get user's rank by balance (if not in top 10)
+const getUserBalanceRank = async (req, res) => {
+  try {
+    const { userId } = req.params
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      })
+    }
+
+    // Find the user
+    const user = await User.findById(userId).select('balance name username email profilePicture')
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      })
+    }
+
+    // Count users with higher balance
+    const rank = await User.countDocuments({
+      isActive: true,
+      balance: { $gt: user.balance || 0 }
+    }) + 1
+
+    // Get total users count
+    const totalUsers = await User.countDocuments({ 
+      isActive: true,
+      balance: { $gt: 0 }
+    })
+
+    res.json({
+      success: true,
+      data: {
+        rank: rank,
+        totalUsers: totalUsers,
+        topPercentile: totalUsers > 0 ? ((rank / totalUsers) * 100).toFixed(1) : 0,
+        user: {
+          id: user._id,
+          name: user.name || user.username || 'Anonymous User',
+          balance: user.balance || 0,
+          profilePicture: user.profilePicture || null
+        }
+      }
+    })
+
+  } catch (error) {
+    console.error('❌ Error in getUserBalanceRank:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching user rank',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
+  }
+}
+
+// Get leaderboard with pagination (if you want more than top 10)
+const getLeaderboardPaginated = async (req, res) => {
+  try {
+    const page = Number.parseInt(req.query.page) || 1
+    const limit = Number.parseInt(req.query.limit) || 20
+    const skip = (page - 1) * limit
+
+    // Get paginated users
+    const users = await User.find({ 
+      isActive: true,
+      balance: { $gt: 0 }
+    })
+    .select('name username email balance profilePicture country')
+    .sort({ balance: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean()
+
+    // Get total count for pagination
+    const totalUsers = await User.countDocuments({ 
+      isActive: true,
+      balance: { $gt: 0 }
+    })
+
+    const totalPages = Math.ceil(totalUsers / limit)
+
+    const formattedUsers = users.map((user, index) => ({
+      rank: skip + index + 1,
+      id: user._id,
+      name: user.name || user.username || 'Anonymous User',
+      email: user.email,
+      balance: user.balance || 0,
+      profilePicture: user.profilePicture || null,
+      country: user.country || 'Unknown'
+    }))
+
+    res.json({
+      success: true,
+      data: {
+        users: formattedUsers,
+        pagination: {
+          currentPage: page,
+          totalPages: totalPages,
+          totalUsers: totalUsers,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1
+        }
+      }
+    })
+
+  } catch (error) {
+    console.error('❌ Error in getLeaderboardPaginated:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching leaderboard',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
+  }
+}
 module.exports = {
+  getTopBalanceUsers,
+  getUserBalanceRank,
+  getLeaderboardPaginated,
   getUsers,
   updateUser,
   updateUserSession,
