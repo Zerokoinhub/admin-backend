@@ -125,7 +125,16 @@ router.post("/edit-balance", userController.editUserBalance)
 // Protected profile routes
 // router.get("/profile", auth, userController.getProfile)
 // router.put("/profile", auth, userController.updateProfile)
+// ===== LEADERBOARD ROUTES =====
 
+// Get top 10 users by balance
+router.get('/leaderboard/top10', userController.getTopBalanceUsers)
+
+// Get user's rank by balance
+router.get('/leaderboard/rank/:userId', userController.getUserBalanceRank)
+
+// Get paginated leaderboard (optional - for "view more" functionality)
+router.get('/leaderboard/all', userController.getLeaderboardPaginated)
 // Protected admin routes
 // router.put("/:id", auth, validateUserUpdate, userController.updateUser)
 // router.put("/:id/ban", auth, userController.banUser)
