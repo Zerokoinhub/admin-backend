@@ -41,53 +41,26 @@ const validateScreenshot = [
 ]
 
 // Debug: Check if all controller functions exist
-console.log("Available controller functions:", Object.keys(userController))
+console.log("🔥 Available controller functions:", Object.keys(userController))
 
-// ===== BASIC USER ROUTES =====
+// ============ TEST ROUTES (Place FIRST - for debugging) ============
+router.get('/test', (req, res) => {
+  res.json({ success: true, message: 'User routes are working properly' });
+});
 
-// Get all users (with pagination, search, filtering)
-router.get("/", userController.getUsers)
+// ============ LEADERBOARD ROUTES (Place SECOND - before any :id routes) ============
+console.log("🔥 Registering leaderboard routes...");
 
-// Get user profile (current user)
-// router.get("/profile", auth, userController.getProfile)
+// Get top 10 users by balance
+router.get('/leaderboard/top10', userController.getTopBalanceUsers)
 
-// Update user profile (current user)
-// router.put("/profile", auth, userController.updateProfile)
+// Get user's rank by balance
+router.get('/leaderboard/rank/:userId', userController.getUserBalanceRank)
 
-// Update any user (admin function)
-router.put("/:id", validateUserUpdate, userController.updateUser)
+// Get paginated leaderboard (optional - for "view more" functionality)
+router.get('/leaderboard/all', userController.getLeaderboardPaginated)
 
-// ===== SESSION MANAGEMENT =====
-
-// Get user sessions
-router.get("/:id/sessions", userController.getUserSessions)
-
-// Update user session (unlock, complete, claim, lock)
-router.put("/:id/sessions", validateSessionUpdate, userController.updateUserSession)
-
-// ===== NOTIFICATION SETTINGS =====
-
-// Update notification settings
-router.put("/:id/notifications", validateNotificationSettings, userController.updateNotificationSettings)
-
-// ===== FCM TOKEN MANAGEMENT =====
-
-// Add FCM token
-router.post("/:id/fcm-token", validateFcmToken, userController.addFcmToken)
-
-// Remove FCM token
-router.delete("/:id/fcm-token", validateFcmToken, userController.removeFcmToken)
-
-// ===== SCREENSHOT MANAGEMENT =====x
-
-//GET Screenshot
-router.get("/:userId/screenshots", userController.getUserScreenshots);
-
-// Add screenshot
-router.post("/:id/screenshots", validateScreenshot, userController.addScreenshot)
-
-// ===== STATISTICS AND ANALYTICS =====
-
+// ============ STATISTICS AND ANALYTICS ROUTES (Place THIRD) ============
 // Get comprehensive user statistics
 router.get("/stats/overview", userController.getUserStats)
 
@@ -97,13 +70,36 @@ router.get("/stats/referrals", userController.getTotalReferrals)
 // Get total connected wallets
 router.get("/stats/wallets", userController.getTotalConnectedWallets)
 
-// Get calculator users
-router.get("/calculator-users", userController.getCalculatorUsers)
-
 // Get total calculator usage
 router.get("/stats/calculator-usage", userController.getTotalCalculatorUsage)
 
-// ===== USER MANAGEMENT ACTIONS =====
+// ============ SPECIAL USER ROUTES (Place FOURTH - specific endpoints) ============
+// Get all users (with pagination, search, filtering)
+router.get("/", userController.getUsers)
+
+// Get calculator users
+router.get("/calculator-users", userController.getCalculatorUsers)
+
+// Edit user balance (specific endpoint)
+router.post("/edit-balance", userController.editUserBalance)
+
+// ============ PARAMETERIZED ROUTES WITH PREFIXES (Place FIFTH) ============
+// Get user sessions
+router.get("/:id/sessions", userController.getUserSessions)
+
+// Update user session (unlock, complete, claim, lock)
+router.put("/:id/sessions", validateSessionUpdate, userController.updateUserSession)
+
+// Update notification settings
+router.put("/:id/notifications", validateNotificationSettings, userController.updateNotificationSettings)
+
+// FCM token management
+router.post("/:id/fcm-token", validateFcmToken, userController.addFcmToken)
+router.delete("/:id/fcm-token", validateFcmToken, userController.removeFcmToken)
+
+// Screenshot management
+router.get("/:userId/screenshots", userController.getUserScreenshots);
+router.post("/:id/screenshots", validateScreenshot, userController.addScreenshot)
 
 // Ban user
 router.put("/:id/ban", userController.banUser)
@@ -114,28 +110,22 @@ router.put("/:id/unban", userController.unbanUser)
 // Manual coin transfer
 router.post("/:id/transfer", userController.manualCoinTransfer)
 
-// Edit user balance (specific endpoint)
-router.post("/edit-balance", userController.editUserBalance)
+// ============ GENERIC USER BY ID ROUTES (Place LAST - most generic) ============
+// Update any user (admin function) - THIS MUST COME AFTER ALL OTHER :id ROUTES
+router.put("/:id", validateUserUpdate, userController.updateUser)
 
-// ===== AUTHENTICATION ROUTES (commented out - uncomment when auth middleware is available) =====
+// Get user by ID - if you have this endpoint, add it here
+// router.get("/:id", userController.getUserById)
 
+// ============ AUTHENTICATION ROUTES (commented out - uncomment when auth middleware is available) ============
 // Change password
 // router.put("/change-password", auth, userController.changePassword)
 
 // Protected profile routes
 // router.get("/profile", auth, userController.getProfile)
 // router.put("/profile", auth, userController.updateProfile)
-// ===== LEADERBOARD ROUTES =====
 
-// Get top 10 users by balance
-router.get('/leaderboard/top10', userController.getTopBalanceUsers)
-
-// Get user's rank by balance
-router.get('/leaderboard/rank/:userId', userController.getUserBalanceRank)
-
-// Get paginated leaderboard (optional - for "view more" functionality)
-router.get('/leaderboard/all', userController.getLeaderboardPaginated)
-// Protected admin routes
+// Protected admin routes (commented out)
 // router.put("/:id", auth, validateUserUpdate, userController.updateUser)
 // router.put("/:id/ban", auth, userController.banUser)
 // router.put("/:id/unban", auth, userController.unbanUser)
