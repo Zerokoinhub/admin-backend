@@ -2,29 +2,43 @@
 const Course = require("../models/course.model");
 
 // Create/upload a new course
+// In your backend course.controller.js
 exports.uploadCourse = async (req, res) => {
   try {
     const { languages, uploadedBy } = req.body;
 
-    // Validation
-    if (!languages || !languages.en || !uploadedBy) {
+    // ✅ Validation: Check if at least one language has content
+    if (!languages || Object.keys(languages).length === 0 || !uploadedBy) {
       return res.status(400).json({ 
         success: false, 
-        message: "Missing required fields. English content is required." 
+        message: "Missing required fields. At least one language content is required." 
       });
     }
 
-    // Validate English has required content
-    if (!languages.en.courseName || !Array.isArray(languages.en.pages)) {
+    // ✅ Find the first language that has content (any language, not necessarily English)
+    const firstLanguage = Object.keys(languages).find(
+      lang => languages[lang] && languages[lang].courseName
+    );
+    
+    if (!firstLanguage) {
       return res.status(400).json({ 
         success: false, 
-        message: "English course name and pages are required" 
+        message: "At least one language must have a course name" 
+      });
+    }
+
+    // Validate that the first found language has pages
+    const firstLangData = languages[firstLanguage];
+    if (!firstLangData.courseName || !Array.isArray(firstLangData.pages)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Course name and pages are required for at least one language" 
       });
     }
 
     // Filter out empty languages
     const filteredLanguages = {};
-    const supportedLanguages = ['en', 'es', 'fr', 'de', 'zh', 'ar'];
+    const supportedLanguages = ['en', 'es', 'fr', 'de', 'zh', 'ar', 'hi', 'ur'];
     
     supportedLanguages.forEach(lang => {
       if (languages[lang] && languages[lang].courseName) {
@@ -57,7 +71,6 @@ exports.uploadCourse = async (req, res) => {
     });
   }
 };
-
 // Edit/update an existing course
 exports.editCourse = async (req, res) => {
   try {
