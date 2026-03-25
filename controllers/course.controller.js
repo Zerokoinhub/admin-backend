@@ -1,13 +1,11 @@
-// controllers/course.controller.js
 const Course = require("../models/course.model");
 
 // Create/upload a new course
-// In your backend course.controller.js
 exports.uploadCourse = async (req, res) => {
   try {
     const { languages, uploadedBy } = req.body;
 
-    // ✅ Validation: Check if at least one language has content
+    // Validation: Check if at least one language has content
     if (!languages || Object.keys(languages).length === 0 || !uploadedBy) {
       return res.status(400).json({ 
         success: false, 
@@ -15,7 +13,7 @@ exports.uploadCourse = async (req, res) => {
       });
     }
 
-    // ✅ Find the first language that has content (any language, not necessarily English)
+    // Find the first language that has content (any language, not necessarily English)
     const firstLanguage = Object.keys(languages).find(
       lang => languages[lang] && languages[lang].courseName
     );
@@ -71,30 +69,50 @@ exports.uploadCourse = async (req, res) => {
     });
   }
 };
-// Edit/update an existing course
+
+// Edit/update an existing course - FIXED: No longer requires English
 exports.editCourse = async (req, res) => {
   try {
     const { id } = req.params;
     const { languages } = req.body;
 
-    // Validation
-    if (!languages || !languages.en) {
+    // ✅ FIX: Check if at least ONE language has content
+    if (!languages || Object.keys(languages).length === 0) {
       return res.status(400).json({
         success: false,
-        message: "English content is required",
+        message: "At least one language content is required",
       });
     }
 
-    // Filter out empty languages
-    const filteredLanguages = {};
-    const supportedLanguages = ['en', 'es', 'fr', 'de', 'zh', 'ar'];
+    // Find the existing course first
+    const existingCourse = await Course.findById(id);
+    if (!existingCourse) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Course not found" 
+      });
+    }
+
+    // Merge existing languages with new/updated languages
+    const mergedLanguages = { ...existingCourse.languages.toObject() };
     
+    // Add/update the provided languages
+    const supportedLanguages = ['en', 'es', 'fr', 'de', 'zh', 'ar', 'hi', 'ur'];
     supportedLanguages.forEach(lang => {
       if (languages[lang] && languages[lang].courseName) {
-        filteredLanguages[lang] = languages[lang];
+        mergedLanguages[lang] = languages[lang];
       }
     });
 
+    // Filter out empty languages (keep only those with valid course names)
+    const filteredLanguages = {};
+    supportedLanguages.forEach(lang => {
+      if (mergedLanguages[lang] && mergedLanguages[lang].courseName) {
+        filteredLanguages[lang] = mergedLanguages[lang];
+      }
+    });
+
+    // Update the course
     const course = await Course.findByIdAndUpdate(
       id,
       { languages: filteredLanguages },
@@ -160,7 +178,7 @@ exports.getCourses = async (req, res) => {
 exports.getCourseById = async (req, res) => {
   try {
     const { id } = req.params;
-    const { lang = 'en' } = req.query; // Optional language parameter
+    const { lang = 'en' } = req.query;
 
     const course = await Course.findById(id)
       .populate('uploadedBy', 'username email');
@@ -270,7 +288,9 @@ exports.getAvailableLanguages = async (req, res) => {
       fr: 'Français',
       de: 'Deutsch',
       zh: '中文',
-      ar: 'العربية'
+      ar: 'العربية',
+      hi: 'हिंदी',
+      ur: 'اردو'
     };
 
     const languagesWithNames = languages.map(lang => ({
