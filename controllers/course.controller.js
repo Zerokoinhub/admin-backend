@@ -175,6 +175,7 @@ exports.getCourses = async (req, res) => {
 };
 
 // Get course by ID
+// Get course by ID
 exports.getCourseById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -190,14 +191,22 @@ exports.getCourseById = async (req, res) => {
       });
     }
 
-    // Get localized content based on requested language
+    // ✅ Get localized content based on requested language
     const localizedContent = course.getLocalizedContent(lang);
 
+    // ✅ Return ONLY the localized content as the main course
     res.json({ 
       success: true, 
       course: {
-        ...course.toObject(),
-        ...localizedContent
+        _id: course._id,
+        courseName: localizedContent.courseName,
+        pages: localizedContent.pages,
+        language: lang,
+        isActive: course.isActive,
+        createdAt: course.createdAt,
+        updatedAt: course.updatedAt,
+        uploadedBy: course.uploadedBy,
+        availableLanguages: course.availableLanguages
       }
     });
   } catch (error) {
@@ -209,7 +218,6 @@ exports.getCourseById = async (req, res) => {
     });
   }
 };
-
 // Get courses by language (for Flutter app)
 exports.getCoursesByLanguage = async (req, res) => {
   try {
