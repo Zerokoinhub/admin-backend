@@ -354,6 +354,7 @@ exports.getCourses = async (req, res) => {
 
 // Get course by ID
 // Get course by ID
+// Get course by ID
 exports.getCourseById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -372,19 +373,20 @@ exports.getCourseById = async (req, res) => {
     // ✅ Get localized content based on requested language
     const localizedContent = course.getLocalizedContent(lang);
 
-    // ✅ Return ONLY the localized content as the main course
+    // ✅ Return the localized content as the main course
     res.json({ 
       success: true, 
       course: {
         _id: course._id,
         courseName: localizedContent.courseName,
         pages: localizedContent.pages,
-        language: lang,
+        language: lang,  // ← This should be the requested language
         isActive: course.isActive,
         createdAt: course.createdAt,
         updatedAt: course.updatedAt,
         uploadedBy: course.uploadedBy,
-        availableLanguages: course.availableLanguages
+        availableLanguages: course.availableLanguages,
+        languages: course.languages  // ← Keep this for reference if needed
       }
     });
   } catch (error) {
@@ -395,8 +397,7 @@ exports.getCourseById = async (req, res) => {
       error: error.message,
     });
   }
-};
-// Get courses by language (for Flutter app)
+};// Get courses by language (for Flutter app)
 exports.getCoursesByLanguage = async (req, res) => {
   try {
     const { language } = req.params;
