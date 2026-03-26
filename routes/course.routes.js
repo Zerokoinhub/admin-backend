@@ -1,3 +1,4 @@
+router.get('/list-all', courseController.getAllCoursesList);
 // routes/course.routes.js
 const express = require('express');
 const courseController = require('../controllers/course.controller');
