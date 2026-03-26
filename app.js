@@ -61,6 +61,62 @@ mongoose
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+// In src/app.js - add this after app.use("/api/users", userRoutes);
+
+// ============ LEADERBOARD ENDPOINT ============
+app.get('/api/users/leaderboard/top10', async (req, res) => {
+  try {
+    console.log('📊 Leaderboard endpoint hit');
+    const User = require('../models/user.model');
+    
+    const topUsers = await User.find({ isActive: true, balance: { $gt: 0 } })
+      .select('name username email balance profilePicture')
+      .sort({ balance: -1 })
+      .limit(10)
+      .lean();
+    
+    const formattedUsers = topUsers.map((user, index) => ({
+      rank: index + 1,
+      id: user._id,
+      name: user.name || user.username || 'Anonymous User',
+      email: user.email,
+      balance: user.balance || 0,
+      profilePicture: user.profilePicture || null,
+      username: user.username || ''
+    }));
+    
+    const totalUsers = await User.countDocuments({ isActive: true, balance: { $gt: 0 } });
+    
+    res.json({
+      success: true,
+      data: {
+        topUsers: formattedUsers,
+        stats: {
+          totalUsersWithBalance: totalUsers,
+          averageBalance: 0,
+          highestBalance: formattedUsers[0]?.balance || 0,
+          lastUpdated: new Date().toISOString()
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Leaderboard error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching leaderboard',
+      error: error.message 
+    });
+  }
+});
+
+// Add a simple test endpoint
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'API is working!',
+    timestamp: new Date().toISOString()
+  });
+});
 app.use("/api/courses", courseRoutes);
 app.use("/api/pages", pageRoutes);
 app.use("/api/admin", adminRoutes);
