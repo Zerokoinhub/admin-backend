@@ -3,6 +3,42 @@ const Course = require("../models/course.model");
 // Create/upload a new course
 // Add to course.controller.js
 // Add this function to course.controller.js
+// Add this function to course.controller.js
+exports.listAllActiveCourses = async (req, res) => {
+  try {
+    console.log('📚 Listing all active courses');
+    
+    const courses = await Course.find({ isActive: true })
+      .select('_id languages availableLanguages isActive')
+      .lean();
+    
+    const result = courses.map(course => ({
+      id: course._id,
+      isActive: course.isActive,
+      availableLanguages: course.availableLanguages || [],
+      englishName: course.languages?.en?.courseName || null,
+      arabicName: course.languages?.ar?.courseName || null,
+      hasEnglish: !!course.languages?.en?.courseName,
+      hasArabic: !!course.languages?.ar?.courseName,
+      pagesCount: {
+        en: course.languages?.en?.pages?.length || 0,
+        ar: course.languages?.ar?.pages?.length || 0
+      }
+    }));
+    
+    res.json({
+      success: true,
+      totalActiveCourses: courses.length,
+      courses: result
+    });
+  } catch (error) {
+    console.error('Error listing courses:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+};
 exports.getAllCoursesSimple = async (req, res) => {
   try {
     console.log('📚 Fetching all courses with their languages');
