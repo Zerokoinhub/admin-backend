@@ -1,6 +1,45 @@
 const Course = require("../models/course.model");
 
 // Create/upload a new course
+// Add to course.controller.js
+exports.debugCourseStructure = async (req, res) => {
+  try {
+    const { courseName } = req.params;
+    
+    const course = await Course.findOne({ 
+      'languages.en.courseName': courseName 
+    });
+    
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    
+    const debug = {
+      id: course._id,
+      availableLanguages: course.availableLanguages,
+      languages: {}
+    };
+    
+    // Show what languages actually have content
+    const langKeys = ['en', 'ar', 'es', 'fr', 'de', 'zh'];
+    langKeys.forEach(lang => {
+      if (course.languages && course.languages[lang]) {
+        debug.languages[lang] = {
+          exists: true,
+          courseName: course.languages[lang].courseName,
+          pagesCount: course.languages[lang].pages?.length || 0,
+          firstPageTitle: course.languages[lang].pages?.[0]?.title || null
+        };
+      } else {
+        debug.languages[lang] = { exists: false };
+      }
+    });
+    
+    res.json(debug);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 exports.uploadCourse = async (req, res) => {
   try {
     const { languages, uploadedBy } = req.body;
