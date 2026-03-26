@@ -4,6 +4,8 @@ const courseController = require('../controllers/course.controller');
 
 const router = express.Router();
 
+// In course.routes.js - place this BEFORE router.get('/:id', ...)
+router.get('/all-simple', courseController.getAllCoursesSimple);
 // Basic CRUD
 router.get('/', courseController.getCourses);
 router.get('/:id', courseController.getCourseById);
