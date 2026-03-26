@@ -5,6 +5,37 @@ const Course = require("../models/course.model");
 // Add this function to course.controller.js
 // Add this function to course.controller.js
 // Add this function to course.controller.js
+// Add to course.controller.js
+exports.getCourseStructure = async (req, res) => {
+  try {
+    // Get all courses without filtering
+    const courses = await Course.find({})
+      .select('_id languages isActive')
+      .lean();
+    
+    const result = courses.map(course => ({
+      id: course._id,
+      isActive: course.isActive,
+      languages: Object.keys(course.languages || {}),
+      hasEnglish: !!course.languages?.en,
+      hasArabic: !!course.languages?.ar,
+      englishName: course.languages?.en?.courseName || null,
+      arabicName: course.languages?.ar?.courseName || null,
+      englishPagesCount: course.languages?.en?.pages?.length || 0,
+      arabicPagesCount: course.languages?.ar?.pages?.length || 0,
+      firstEnglishPageTitle: course.languages?.en?.pages?.[0]?.title || null,
+      firstArabicPageTitle: course.languages?.ar?.pages?.[0]?.title || null
+    }));
+    
+    res.json({
+      success: true,
+      totalCourses: courses.length,
+      courses: result
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 exports.getAllCoursesList = async (req, res) => {
   try {
     console.log('📚 Fetching ALL courses from database');
