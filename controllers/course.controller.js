@@ -347,3 +347,16 @@ exports.deleteCourse = async (req, res) => {
     });
   }
 };
+// Add this to course.controller.js
+exports.debugRoutes = async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      message: "Course routes are working",
+      availableLanguages: ['en', 'ar', 'es', 'fr', 'de', 'zh'],
+      testEndpoint: '/api/courses/language/ar should work'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
