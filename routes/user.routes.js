@@ -1,4 +1,24 @@
 // Add this at the VERY TOP of user.routes.js
+// This should always work if the file is loaded
+router.get('/health-check', (req, res) => {
+  console.log('✅ Health check route hit!');
+  res.json({ 
+    success: true, 
+    message: 'User routes are loaded and working!',
+    timestamp: new Date().toISOString()
+  });
+});
+
+console.log('========================================');
+console.log('🔧 USER ROUTES FILE IS BEING LOADED');
+console.log('========================================');
+
+const express = require("express")
+const router = express.Router()
+const userController = require("../controllers/user.controller")
+
+console.log('✅ Controller loaded, functions:', Object.keys(userController));
+console.log('========================================');
 router.get('/test-connection', (req, res) => {
   console.log('✅ Test connection route hit!');
   res.json({
