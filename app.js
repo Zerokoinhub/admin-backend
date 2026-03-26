@@ -1,12 +1,11 @@
 // ============================================
-// src/app.js - FULLY FIXED WITH DEBUG LOGS
+// src/app.js - FULLY FIXED
 // ============================================
 
 console.log('========================================');
 console.log('🚀 STARTING SERVER INITIALIZATION');
 console.log('========================================');
-console.log('Current time:', new Date().toISOString());
-console.log('Node version:', process.version);
+console.log('Time:', new Date().toISOString());
 console.log('Working directory:', process.cwd());
 console.log('========================================');
 
@@ -35,7 +34,7 @@ const app = express();
 console.log('✅ Express app created');
 
 // ============================================
-// BASIC MIDDLEWARE
+// MIDDLEWARE
 // ============================================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -68,43 +67,33 @@ app.use(morgan("dev"));
 console.log('✅ Middleware configured');
 
 // ============================================
-// SIMPLE TEST ROUTES - MUST WORK
+// SIMPLE TEST ENDPOINTS
 // ============================================
 
-// Root endpoint
 app.get('/', (req, res) => {
   console.log('📡 Root endpoint hit');
   res.json({ 
     success: true, 
-    message: 'Server is running!',
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      health: '/health',
-      test: '/api/test',
-      ping: '/ping',
-      leaderboard: '/api/users/leaderboard/top10'
-    }
+    message: 'ZeroKoin API Server is running!',
+    timestamp: new Date().toISOString()
   });
 });
 
-// Ping endpoint
 app.get('/ping', (req, res) => {
   console.log('📡 Ping endpoint hit');
   res.json({ success: true, message: 'pong', timestamp: new Date().toISOString() });
 });
 
-// Health check
-app.get("/health", (req, res) => {
+app.get('/health', (req, res) => {
   console.log('📡 Health check hit');
-  res.status(200).json({
-    success: true,
-    status: "healthy",
-    message: "Server is running",
-    timestamp: new Date().toISOString(),
+  res.json({ 
+    success: true, 
+    status: 'healthy',
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
   });
 });
 
-// Test endpoint
 app.get('/api/test', (req, res) => {
   console.log('📡 API test endpoint hit');
   res.json({ 
@@ -114,7 +103,7 @@ app.get('/api/test', (req, res) => {
   });
 });
 
-console.log('✅ Basic test routes added');
+console.log('✅ Test endpoints added');
 
 // ============================================
 // DATABASE CONNECTION
@@ -122,60 +111,52 @@ console.log('✅ Basic test routes added');
 console.log('📦 Connecting to MongoDB...');
 
 mongoose
-  .connect(
-    process.env.MONGODB_URI || "mongodb://localhost:27017/zerokoin-admin",
-    {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    }
-  )
+  .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/zerokoin-admin")
   .then(() => console.log('✅ Connected to MongoDB'))
   .catch((err) => console.error('❌ MongoDB connection error:', err));
 
 // ============================================
-// REGULAR ROUTES
+// ROUTES
 // ============================================
 console.log('📦 Mounting route handlers...');
 
 app.use("/api/auth", authRoutes);
-console.log('✅ Auth routes mounted at /api/auth');
+console.log('✅ Auth routes mounted');
 
 app.use("/api/users", userRoutes);
-console.log('✅ User routes mounted at /api/users');
+console.log('✅ User routes mounted');
 
 app.use("/api/courses", courseRoutes);
-console.log('✅ Course routes mounted at /api/courses');
+console.log('✅ Course routes mounted');
 
 app.use("/api/pages", pageRoutes);
-console.log('✅ Page routes mounted at /api/pages');
+console.log('✅ Page routes mounted');
 
 app.use("/api/admin", adminRoutes);
-console.log('✅ Admin routes mounted at /api/admin');
+console.log('✅ Admin routes mounted');
 
 app.use("/api/notifications", notificationRoutes);
-console.log('✅ Notification routes mounted at /api/notifications');
+console.log('✅ Notification routes mounted');
 
 app.use("/api/transfer", transferRoutes);
-console.log('✅ Transfer routes mounted at /api/transfer');
+console.log('✅ Transfer routes mounted');
 
 app.use("/api/admob", admobRoutes);
-console.log('✅ AdMob routes mounted at /api/admob');
+console.log('✅ AdMob routes mounted');
 
 app.use("/api/withdrawals", withdrawalRoutes);
-console.log('✅ Withdrawal routes mounted at /api/withdrawals');
+console.log('✅ Withdrawal routes mounted');
 
 // ============================================
-// LEADERBOARD ENDPOINT - DIRECT IN APP.JS
+// LEADERBOARD ENDPOINT
 // ============================================
 console.log('📊 Setting up leaderboard endpoint...');
 
 app.get('/api/users/leaderboard/top10', async (req, res) => {
   try {
-    console.log('📊 Leaderboard endpoint hit!');
+    console.log('📊 Leaderboard endpoint hit');
     
-    // Dynamically require User model
     const User = require('../models/user.model');
-    console.log('✅ User model loaded for leaderboard');
     
     const topUsers = await User.find({ isActive: true, balance: { $gt: 0 } })
       .select('name username email balance profilePicture')
@@ -219,15 +200,16 @@ app.get('/api/users/leaderboard/top10', async (req, res) => {
   }
 });
 
-console.log('✅ Leaderboard endpoint added at /api/users/leaderboard/top10');
+console.log('✅ Leaderboard endpoint added');
 
 // ============================================
-// DEBUG ENDPOINT - LIST ALL ROUTES
+// DEBUG ROUTES
 // ============================================
 app.get('/debug-routes', (req, res) => {
   const routes = [];
   
   function extractRoutes(stack, basePath = '') {
+    if (!stack) return;
     stack.forEach(layer => {
       if (layer.route) {
         const methods = Object.keys(layer.route.methods).join(', ').toUpperCase();
@@ -235,7 +217,7 @@ app.get('/debug-routes', (req, res) => {
           path: basePath + layer.route.path,
           methods: methods
         });
-      } else if (layer.name === 'router' && layer.handle.stack) {
+      } else if (layer.name === 'router' && layer.handle && layer.handle.stack) {
         let routerPath = '';
         if (layer.regexp) {
           const pathStr = layer.regexp.toString();
@@ -249,7 +231,9 @@ app.get('/debug-routes', (req, res) => {
     });
   }
   
-  extractRoutes(app._router.stack);
+  if (app._router && app._router.stack) {
+    extractRoutes(app._router.stack);
+  }
   
   res.json({
     success: true,
@@ -257,8 +241,6 @@ app.get('/debug-routes', (req, res) => {
     routes: routes.sort((a, b) => a.path.localeCompare(b.path))
   });
 });
-
-console.log('✅ Debug routes added');
 
 // ============================================
 // ERROR HANDLER
@@ -275,18 +257,17 @@ app.use((err, req, res, next) => {
 // ============================================
 // START SERVER
 // ============================================
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log('========================================');
   console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`📡 Base URL: http://localhost:${PORT}`);
   console.log('========================================');
   console.log('📋 AVAILABLE ENDPOINTS:');
-  console.log(`   GET  /                 - Root endpoint`);
-  console.log(`   GET  /ping             - Ping test`);
-  console.log(`   GET  /health           - Health check`);
-  console.log(`   GET  /api/test         - API test`);
-  console.log(`   GET  /debug-routes     - List all routes`);
+  console.log(`   GET  /                           - Root endpoint`);
+  console.log(`   GET  /ping                       - Ping test`);
+  console.log(`   GET  /health                     - Health check`);
+  console.log(`   GET  /api/test                   - API test`);
+  console.log(`   GET  /debug-routes               - List all routes`);
   console.log(`   GET  /api/users/leaderboard/top10 - Leaderboard`);
   console.log('========================================');
   console.log('✅ Server initialization complete');
