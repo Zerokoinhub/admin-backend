@@ -3,7 +3,8 @@ const express = require('express');
 const courseController = require('../controllers/course.controller');
 
 const router = express.Router();
-
+// In course.routes.js - add this BEFORE router.get('/:id', ...)
+router.get('/list-active', courseController.listAllActiveCourses);
 // In course.routes.js - place this BEFORE router.get('/:id', ...)
 router.get('/all-simple', courseController.getAllCoursesSimple);
 // Basic CRUD
