@@ -1,3 +1,12 @@
+// Add this at the VERY TOP of user.routes.js
+router.get('/test-connection', (req, res) => {
+  console.log('✅ Test connection route hit!');
+  res.json({
+    success: true,
+    message: 'User routes are working!',
+    timestamp: new Date().toISOString()
+  });
+});
 const express = require("express")
 const router = express.Router()
 const userController = require("../controllers/user.controller")
