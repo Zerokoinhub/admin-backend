@@ -355,10 +355,13 @@ exports.getCourses = async (req, res) => {
 // Get course by ID
 // Get course by ID
 // Get course by ID
+// Get course by ID
 exports.getCourseById = async (req, res) => {
   try {
     const { id } = req.params;
     const { lang = 'en' } = req.query;
+
+    console.log(`📚 Fetching course ${id} in language: ${lang}`);
 
     const course = await Course.findById(id)
       .populate('uploadedBy', 'username email');
@@ -373,20 +376,22 @@ exports.getCourseById = async (req, res) => {
     // ✅ Get localized content based on requested language
     const localizedContent = course.getLocalizedContent(lang);
 
-    // ✅ Return the localized content as the main course
+    console.log(`✅ Found course: ${localizedContent.courseName}`);
+    console.log(`📄 Pages: ${localizedContent.pages?.length || 0}`);
+
+    // ✅ Return ONLY the localized content
     res.json({ 
       success: true, 
       course: {
         _id: course._id,
         courseName: localizedContent.courseName,
         pages: localizedContent.pages,
-        language: lang,  // ← This should be the requested language
+        language: lang,
         isActive: course.isActive,
         createdAt: course.createdAt,
         updatedAt: course.updatedAt,
         uploadedBy: course.uploadedBy,
-        availableLanguages: course.availableLanguages,
-        languages: course.languages  // ← Keep this for reference if needed
+        availableLanguages: course.availableLanguages || []
       }
     });
   } catch (error) {
@@ -397,11 +402,14 @@ exports.getCourseById = async (req, res) => {
       error: error.message,
     });
   }
-};// Get courses by language (for Flutter app)
+};
+// Get courses by language (for Flutter app)
 exports.getCoursesByLanguage = async (req, res) => {
   try {
     const { language } = req.params;
     const { page = 1, limit = 10 } = req.query;
+
+    console.log(`📚 Fetching courses in language: ${language}`);
 
     // Find courses that have this language available
     const query = { 
@@ -411,27 +419,38 @@ exports.getCoursesByLanguage = async (req, res) => {
 
     const courses = await Course.find(query)
       .populate('uploadedBy', 'username email')
-      .skip((page - 1) * limit)
+      .skip((parseInt(page) - 1) * parseInt(limit))
       .limit(parseInt(limit));
 
     const total = await Course.countDocuments(query);
 
+    console.log(`✅ Found ${courses.length} courses in ${language}`);
+
     // Transform courses to include only the requested language content
-    const localizedCourses = courses.map(course => ({
-      id: course._id,
-      courseName: course.languages[language]?.courseName || 'Untitled',
-      pages: course.languages[language]?.pages || [],
-      uploadedBy: course.uploadedBy,
-      availableLanguages: course.availableLanguages,
-      createdAt: course.createdAt
-    }));
+    const localizedCourses = courses.map(course => {
+      const langContent = course.languages[language];
+      
+      if (!langContent) {
+        console.log(`⚠️ No ${language} content for course ${course._id}`);
+        return null;
+      }
+      
+      return {
+        id: course._id,
+        courseName: langContent.courseName || 'Untitled',
+        pages: langContent.pages || [],
+        uploadedBy: course.uploadedBy,
+        availableLanguages: course.availableLanguages || [],
+        createdAt: course.createdAt
+      };
+    }).filter(course => course !== null); // Remove null entries
 
     res.json({ 
       success: true, 
       courses: localizedCourses,
       pagination: {
         currentPage: parseInt(page),
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / parseInt(limit)),
         totalCourses: total
       }
     });
@@ -443,9 +462,58 @@ exports.getCoursesByLanguage = async (req, res) => {
       error: error.message,
     });
   }
+};// Get available languages (with course counts)
+// Get course by name (for convenience)
+exports.getCourseByName = async (req, res) => {
+  try {
+    const { name } = req.params;
+    const { lang = 'en' } = req.query;
+    
+    console.log(`📚 Finding course by name: ${name} in language: ${lang}`);
+    
+    // Search for course where any language has this name
+    const course = await Course.findOne({
+      $or: [
+        { 'languages.en.courseName': decodeURIComponent(name) },
+        { 'languages.ar.courseName': decodeURIComponent(name) },
+        { 'languages.es.courseName': decodeURIComponent(name) },
+        { 'languages.fr.courseName': decodeURIComponent(name) }
+      ]
+    }).populate('uploadedBy', 'username email');
+    
+    if (!course) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Course not found" 
+      });
+    }
+    
+    // Get localized content
+    const localizedContent = course.getLocalizedContent(lang);
+    
+    res.json({
+      success: true,
+      course: {
+        _id: course._id,
+        courseName: localizedContent.courseName,
+        pages: localizedContent.pages,
+        language: lang,
+        isActive: course.isActive,
+        createdAt: course.createdAt,
+        updatedAt: course.updatedAt,
+        uploadedBy: course.uploadedBy,
+        availableLanguages: course.availableLanguages || []
+      }
+    });
+  } catch (error) {
+    console.error("Error getting course by name:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error getting course",
+      error: error.message,
+    });
+  }
 };
-
-// Get available languages (with course counts)
 exports.getAvailableLanguages = async (req, res) => {
   try {
     const languages = await Course.aggregate([
