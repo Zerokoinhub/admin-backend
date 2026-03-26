@@ -68,7 +68,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/transfer", transferRoutes); // ✅ ENABLED
 app.use("/api/admob", admobRoutes);
 app.use("/api/withdrawals", withdrawalRoutes);
-
+app.use('/api/courses', courseRoutes);
 // Health check
 app.get("/health", (req, res) => {
   res.status(200).json({
