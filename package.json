@@ -2,10 +2,10 @@
   "name": "zerokoin-admin-panel",
   "version": "1.0.0",
   "description": "Admin Panel Backend for ZeroKoin",
-  "main": "app.js",
+  "main": "src/app.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js"
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
   },
   "dependencies": {
     "axios": "^1.10.0",
