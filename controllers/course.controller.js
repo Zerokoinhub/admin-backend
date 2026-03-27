@@ -6,6 +6,94 @@ const Course = require("../models/course.model");
 // Add this function to course.controller.js
 // Add this function to course.controller.js
 // Add to course.controller.js
+const syncFirebaseUser = async (req, res) => {
+    try {
+        console.log('🔄 SYNC endpoint hit!');
+        console.log('Headers:', req.headers);
+        console.log('Body:', req.body);
+        
+        // Get user data from request body
+        const { uid, email, name, photoURL } = req.body;
+        
+        if (!uid || !email) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: uid and email are required'
+            });
+        }
+        
+        console.log(`🔄 Syncing user: ${email} (UID: ${uid})`);
+        
+        // Check if user already exists by uid or email
+        let user = await User.findOne({ $or: [{ uid: uid }, { email: email }] });
+        
+        if (!user) {
+            // Create new user
+            const username = name ? name.toLowerCase().replace(/\s/g, '') : email.split('@')[0];
+            
+            user = new User({
+                uid: uid,
+                email: email,
+                name: name || email.split('@')[0],
+                username: username,
+                photoURL: photoURL || '',
+                balance: 0,
+                isActive: true,
+                role: 'user',
+                lastLogin: new Date(),
+                // Initialize sessions
+                sessions: [
+                    { sessionNumber: 1, isLocked: false },
+                    { sessionNumber: 2, isLocked: true },
+                    { sessionNumber: 3, isLocked: true },
+                    { sessionNumber: 4, isLocked: true }
+                ]
+            });
+            
+            // Generate invite code
+            user.generateInviteCode();
+            
+            await user.save();
+            console.log(`✅ New user created: ${email}`);
+        } else {
+            // Update existing user
+            if (!user.uid && uid) user.uid = uid;
+            if (name) user.name = name;
+            if (photoURL) user.photoURL = photoURL;
+            user.lastLogin = new Date();
+            
+            await user.save();
+            console.log(`✅ User updated: ${email}`);
+        }
+        
+        // Clear cache to refresh data
+        cache.clear();
+        
+        res.json({
+            success: true,
+            message: 'User synced successfully',
+            user: {
+                id: user._id,
+                uid: user.uid,
+                email: user.email,
+                name: user.name,
+                username: user.username,
+                balance: user.balance,
+                isActive: user.isActive,
+                role: user.role,
+                photoURL: user.photoURL,
+                inviteCode: user.inviteCode
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error syncing user:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error syncing user',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
 exports.getCourseStructure = async (req, res) => {
   try {
     // Get all courses without filtering
