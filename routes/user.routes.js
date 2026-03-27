@@ -159,6 +159,9 @@ router.put("/:id", validateUserUpdate, userController.updateUser)
 // router.put("/:id/ban", auth, userController.banUser)
 // router.put("/:id/unban", auth, userController.unbanUser)
 // router.post("/:id/transfer", auth, userController.manualCoinTransfer)
+// ============ SYNC ROUTE (Add this BEFORE parameterized routes) ============
+// Sync Firebase user to MongoDB
+router.post('/sync', userController.syncFirebaseUser);
 // router.post("/edit-balance", auth, userController.editUserBalance)
 // router.put("/:id/sessions", auth, validateSessionUpdate, userController.updateUserSession)
 // router.put("/:id/notifications", auth, validateNotificationSettings, userController.updateNotificationSettings)
