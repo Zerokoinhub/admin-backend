@@ -1,5 +1,15 @@
 // Add this at the VERY TOP of user.routes.js
 // This should always work if the file is loaded
+// ============ TEST ENDPOINT - ADD THIS AT THE VERY TOP ============
+router.get('/test-deploy', (req, res) => {
+  console.log('✅ TEST-DEPLOY endpoint hit!');
+  res.json({ 
+    success: true, 
+    message: 'NEW CODE IS DEPLOYED!',
+    timestamp: new Date().toISOString(),
+    route: '/api/users/test-deploy'
+  });
+});
 router.get('/health-check', (req, res) => {
   console.log('✅ Health check route hit!');
   res.json({ 
