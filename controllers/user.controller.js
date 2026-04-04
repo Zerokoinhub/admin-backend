@@ -6,49 +6,42 @@ const CACHE_DURATION = 300
 const cache = new Map()
 
 // Get all users with pagination and filtering
+// Get all users with pagination and filtering
 const getUsers = async (req, res) => {
   try {
-    const errors = validationResult(req)
+    const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() })
+      return res.status(400).json({ errors: errors.array() });
     }
 
-    const page = Number.parseInt(req.query.page) || 1
-    const limit = Number.parseInt(req.query.limit) || 10
-    const sortBy = req.query.sortBy || "createdAt"
-    const sortOrder = req.query.sortOrder === "asc" ? 1 : -1
-    const search = req.query.search || ""
-    const role = req.query.role
-    const isActive = req.query.isActive
-    const country = req.query.country
-    const walletStatus = req.query.walletStatus
+    const page = Number.parseInt(req.query.page) || 1;
+    const limit = Number.parseInt(req.query.limit) || 50; // Increased default limit
+    const sortBy = req.query.sortBy || "createdAt";
+    const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
+    const search = req.query.search || "";
+    const role = req.query.role;
+    const isActive = req.query.isActive;
+    const country = req.query.country;
+    const walletStatus = req.query.walletStatus;
 
-    const cacheKey = `users_${page}_${limit}_${sortBy}_${sortOrder}_${search}_${role}_${isActive}_${country}_${walletStatus}`
-
-    if (cache.has(cacheKey)) {
-      const cachedData = cache.get(cacheKey)
-      if (Date.now() - cachedData.timestamp < CACHE_DURATION * 1000) {
-        return res.json(cachedData.data)
-      }
-      cache.delete(cacheKey)
-    }
-
-    const query = {}
+    const query = {};
+    
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: "i" } },
         { username: { $regex: search, $options: "i" } },
         { email: { $regex: search, $options: "i" } },
         { inviteCode: { $regex: search, $options: "i" } },
-      ]
+      ];
     }
 
-    if (role) query.role = role
-    if (isActive !== undefined) query.isActive = isActive === "true"
-    if (country) query.country = { $regex: country, $options: "i" }
-    if (walletStatus) query.walletStatus = walletStatus
+    if (role) query.role = role;
+    if (isActive !== undefined) query.isActive = isActive === "true";
+    if (country) query.country = { $regex: country, $options: "i" };
+    if (walletStatus) query.walletStatus = walletStatus;
 
-    const skip = (page - 1) * limit
+    const skip = (page - 1) * limit;
+    
     const [users, total] = await Promise.all([
       User.find(query)
         .select("-password")
@@ -57,44 +50,37 @@ const getUsers = async (req, res) => {
         .limit(limit)
         .lean(),
       User.countDocuments(query),
-    ])
+    ]);
 
-    const totalPages = Math.ceil(total / limit)
-    const hasNextPage = page < totalPages
-    const hasPrevPage = page > 1
+    const totalPages = Math.ceil(total / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
 
+    // ✅ FIX: Return users directly in data array, not nested
     const responseData = {
       success: true,
-      data: {
-        users,
-        pagination: {
-          currentPage: page,
-          totalPages,
-          totalItems: total,
-          itemsPerPage: limit,
-          hasNextPage,
-          hasPrevPage,
-        },
+      users: users, // Direct array of users
+      data: users, // Also provide as data for compatibility
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems: total,
+        itemsPerPage: limit,
+        hasNextPage,
+        hasPrevPage,
       },
-    }
+    };
 
-    cache.set(cacheKey, {
-      data: responseData,
-      timestamp: Date.now(),
-    })
-
-    res.json(responseData)
+    res.json(responseData);
   } catch (error) {
-    console.error("Error in getUsers:", error)
+    console.error("Error in getUsers:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching users",
       error: process.env.NODE_ENV === "development" ? error.message : undefined,
-    })
+    });
   }
-}
-
-// Update user - handles all editable fields from frontend
+};// Update user - handles all editable fields from frontend
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params
