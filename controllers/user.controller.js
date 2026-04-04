@@ -5,6 +5,115 @@ const { recordTransfer } = require("./transfer.controller")
 const CACHE_DURATION = 300
 const cache = new Map()
 
+
+// Sync Firebase user to MongoDB
+const syncFirebaseUser = async (req, res) => {
+  try {
+    const { uid, email, name, photoURL, deviceId } = req.body;
+
+    if (!uid || !email) {
+      return res.status(400).json({
+        success: false,
+        message: "UID and email are required",
+      });
+    }
+
+    // Check if user exists by UID first, then by email
+    let user = await User.findOne({ $or: [{ uid: uid }, { email: email }] });
+
+    if (user) {
+      // Update existing user
+      user.uid = uid; // Ensure UID is set
+      if (name) user.name = name;
+      if (photoURL) user.photoURL = photoURL;
+      if (deviceId) user.deviceId = deviceId;
+      user.lastLogin = new Date();
+      
+      await user.save();
+      
+      // Ensure sessions exist for user
+      await ensureUserSessions(user._id);
+      
+      return res.json({
+        success: true,
+        message: "User synced successfully",
+        user: {
+          id: user._id,
+          uid: user.uid,
+          name: user.name,
+          email: user.email,
+          balance: user.balance,
+          role: user.role,
+          isActive: user.isActive,
+          sessions: user.sessions,
+        },
+      });
+    } else {
+      // Create new user
+      const username = email.split('@')[0] + Math.random().toString(36).substring(2, 6);
+      
+      user = new User({
+        uid: uid,
+        name: name || email.split('@')[0],
+        username: username,
+        email: email,
+        photoURL: photoURL || "",
+        isActive: true,
+        balance: 0,
+        recentAmount: 0,
+        deviceId: deviceId || "",
+        sessions: [
+          { sessionNumber: 1, isLocked: false, unlockedAt: new Date(), completedAt: null },
+          { sessionNumber: 2, isLocked: true, unlockedAt: null, completedAt: null },
+          { sessionNumber: 3, isLocked: true, unlockedAt: null, completedAt: null },
+          { sessionNumber: 4, isLocked: true, unlockedAt: null, completedAt: null },
+        ],
+      });
+      
+      // Generate invite code
+      user.generateInviteCode();
+      
+      await user.save();
+      
+      return res.status(201).json({
+        success: true,
+        message: "User created and synced successfully",
+        user: {
+          id: user._id,
+          uid: user.uid,
+          name: user.name,
+          email: user.email,
+          balance: user.balance,
+          role: user.role,
+          isActive: user.isActive,
+          sessions: user.sessions,
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Error in syncFirebaseUser:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error syncing user",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+// Helper function to ensure user has sessions
+const ensureUserSessions = async (userId) => {
+  const user = await User.findById(userId);
+  if (user && (!user.sessions || user.sessions.length === 0)) {
+    user.sessions = [
+      { sessionNumber: 1, isLocked: false, unlockedAt: new Date(), completedAt: null },
+      { sessionNumber: 2, isLocked: true, unlockedAt: null, completedAt: null },
+      { sessionNumber: 3, isLocked: true, unlockedAt: null, completedAt: null },
+      { sessionNumber: 4, isLocked: true, unlockedAt: null, completedAt: null },
+    ];
+    await user.save();
+    console.log(`✅ Sessions created for user ${userId}`);
+  }
+};
 // Get all users with pagination and filtering
 // Get all users with pagination and filtering
 const getUsers = async (req, res) => {
@@ -1044,6 +1153,7 @@ const getLeaderboardPaginated = async (req, res) => {
   }
 }
 module.exports = {
+  syncFirebaseUser,
   getTopBalanceUsers,
   getUserBalanceRank,
   getLeaderboardPaginated,
