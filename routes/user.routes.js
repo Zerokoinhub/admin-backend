@@ -1,6 +1,23 @@
 // Add this at the VERY TOP of user.routes.js
 // This should always work if the file is loaded
 // ============ TEST ENDPOINT - ADD THIS AT THE VERY TOP ============
+// Add this temporary test endpoint at the top of your routes file
+router.get('/debug/all-users', async (req, res) => {
+  try {
+    const allUsers = await User.find({}).select('name email uid createdAt');
+    console.log('📊 Total users in DB:', allUsers.length);
+    console.log('Users:', allUsers.map(u => ({ name: u.name, email: u.email, hasUid: !!u.uid })));
+    
+    res.json({
+      success: true,
+      total: allUsers.length,
+      users: allUsers
+    });
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 router.get('/test-deploy', (req, res) => {
   console.log('✅ TEST-DEPLOY endpoint hit!');
   res.json({ 
