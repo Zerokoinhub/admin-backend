@@ -3,6 +3,22 @@
 // ============ TEST ENDPOINT - ADD THIS AT THE VERY TOP ============
 // Add this temporary test endpoint at the top of your routes file
 // Add this temporary debug endpoint
+// Add this at the top of your routes, after the imports
+router.get('/debug/all-users', async (req, res) => {
+  try {
+    const users = await User.find({}).select('name email firebaseUid uid balance isActive');
+    console.log('📊 Total users in DB:', users.length);
+    
+    res.json({
+      success: true,
+      total: users.length,
+      users: users
+    });
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 router.get('/debug/all-users', async (req, res) => {
   try {
     const users = await User.find({}).select('name email firebaseUid uid balance');
