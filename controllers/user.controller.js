@@ -118,75 +118,59 @@ const ensureUserSessions = async (userId) => {
 // Get all users with pagination and filtering
 const getUsers = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const page = Number.parseInt(req.query.page) || 1;
-    const limit = Number.parseInt(req.query.limit) || 50; // Increased default limit
-    const sortBy = req.query.sortBy || "createdAt";
-    const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
+    console.log('📡 GET USERS API CALLED');
+    console.log('Query params:', req.query);
+    
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 100; // Increased limit to get all users
     const search = req.query.search || "";
-    const role = req.query.role;
-    const isActive = req.query.isActive;
-    const country = req.query.country;
-    const walletStatus = req.query.walletStatus;
-
-    const query = {};
+    
+    // Build query
+    let query = {};
     
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: "i" } },
-        { username: { $regex: search, $options: "i" } },
         { email: { $regex: search, $options: "i" } },
-        { inviteCode: { $regex: search, $options: "i" } },
       ];
     }
-
-    if (role) query.role = role;
-    if (isActive !== undefined) query.isActive = isActive === "true";
-    if (country) query.country = { $regex: country, $options: "i" };
-    if (walletStatus) query.walletStatus = walletStatus;
-
+    
+    console.log('Query:', JSON.stringify(query));
+    
     const skip = (page - 1) * limit;
     
-    const [users, total] = await Promise.all([
-      User.find(query)
-        .select("-password")
-        .sort({ [sortBy]: sortOrder })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      User.countDocuments(query),
-    ]);
-
-    const totalPages = Math.ceil(total / limit);
-    const hasNextPage = page < totalPages;
-    const hasPrevPage = page > 1;
-
-    // ✅ FIX: Return users directly in data array, not nested
-    const responseData = {
+    // Get users
+    const users = await User.find(query)
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+    
+    const total = await User.countDocuments(query);
+    
+    console.log(`✅ Found ${users.length} users out of ${total} total`);
+    console.log('First few users:', users.slice(0, 3).map(u => ({ name: u.name, email: u.email })));
+    
+    // Return in the format frontend expects
+    res.json({
       success: true,
-      users: users, // Direct array of users
-      data: users, // Also provide as data for compatibility
+      users: users,  // Direct array
+      data: users,   // Alternative format
       pagination: {
         currentPage: page,
-        totalPages,
+        totalPages: Math.ceil(total / limit),
         totalItems: total,
-        itemsPerPage: limit,
-        hasNextPage,
-        hasPrevPage,
-      },
-    };
-
-    res.json(responseData);
+        itemsPerPage: limit
+      }
+    });
+    
   } catch (error) {
     console.error("Error in getUsers:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching users",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error: error.message
     });
   }
 };// Update user - handles all editable fields from frontend
