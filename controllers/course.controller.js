@@ -11,6 +11,28 @@ const Course = require("../models/course.model");
 // View all courses content
 // Update course language content
 // Get all courses (simple list for dropdown)
+// Debug endpoint to check all courses
+exports.debugAllCourses = async (req, res) => {
+  try {
+    const courses = await Course.find({});
+    console.log(`📚 Total courses in DB: ${courses.length}`);
+    
+    res.json({
+      success: true,
+      totalCourses: courses.length,
+      courses: courses.map(c => ({
+        id: c._id,
+        isActive: c.isActive,
+        hasLanguages: !!c.languages,
+        languages: Object.keys(c.languages || {}),
+        englishName: c.languages?.en?.courseName || null,
+        arabicName: c.languages?.ar?.courseName || null
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 exports.getAllCourses = async (req, res) => {
   try {
     console.log('📚 Fetching all course names');
