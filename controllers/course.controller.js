@@ -6,6 +6,95 @@ const Course = require("../models/course.model");
 // Add this function to course.controller.js
 // Add this function to course.controller.js
 // Add to course.controller.js
+// Get all courses (simple list for dropdown)
+// Update course language content
+exports.updateCourseLanguage = async (req, res) => {
+  try {
+    const { courseId, language, content } = req.body;
+    
+    if (!courseId || !language || !content) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: courseId, language, content'
+      });
+    }
+    
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+    
+    // Update the language content
+    if (!course.languages) course.languages = {};
+    course.languages[language] = content;
+    
+    // Update available languages if needed
+    if (!course.availableLanguages) course.availableLanguages = [];
+    if (!course.availableLanguages.includes(language)) {
+      course.availableLanguages.push(language);
+    }
+    
+    await course.save();
+    
+    res.json({
+      success: true,
+      message: `Language ${language} updated successfully`,
+      course
+    });
+  } catch (error) {
+    console.error('Error updating course language:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating course language',
+      error: error.message
+    });
+  }
+};
+exports.getAllCourses = async (req, res) => {
+  try {
+    console.log('📚 Fetching all course names');
+    
+    // Find all active courses
+    const courses = await Course.find({ isActive: true })
+      .select('languages availableLanguages')
+      .lean();
+    
+    // Extract course names from all available languages
+    const courseNames = [];
+    
+    courses.forEach(course => {
+      if (course.languages) {
+        // Add course names from each language
+        Object.values(course.languages).forEach(langContent => {
+          if (langContent && langContent.courseName) {
+            courseNames.push(langContent.courseName);
+          }
+        });
+      }
+    });
+    
+    // Remove duplicates
+    const uniqueCourseNames = [...new Set(courseNames)];
+    
+    console.log(`✅ Found ${uniqueCourseNames.length} unique course names`);
+    
+    res.json({
+      success: true,
+      courseNames: uniqueCourseNames,
+      totalCourses: uniqueCourseNames.length
+    });
+  } catch (error) {
+    console.error('Error in getAllCourses:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching courses',
+      error: error.message
+    });
+  }
+};
 const syncFirebaseUser = async (req, res) => {
     try {
         console.log('🔄 SYNC endpoint hit!');
