@@ -1,8 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
-const admobController = require("../controllers/admob.controller");
 const qs = require("querystring");
+
+// ✅ FIXED: Path to controller (going up 2 levels from src/routes to root controllers)
+const admobController = require("../../controllers/admob.controller");
 
 // Step 1: OAuth Redirect URI route — GET /api/admob/oauth/callback
 router.get("/oauth/callback", async (req, res) => {
@@ -13,8 +15,7 @@ router.get("/oauth/callback", async (req, res) => {
   }
 
   try {
-    // Exchange code for tokens (you can also move this logic to a controller if needed)
-
+    // Exchange code for tokens
     const tokenResponse = await axios.post(
       "https://oauth2.googleapis.com/token",
       qs.stringify({
@@ -31,7 +32,7 @@ router.get("/oauth/callback", async (req, res) => {
 
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
 
-    // ✅ For testing: just return them in browser (don't do this in production)
+    // For testing: return them in browser
     return res.status(200).send(`
       <h2>✅ Token Received!</h2>
       <p><strong>Access Token:</strong> ${access_token}</p>
@@ -40,15 +41,11 @@ router.get("/oauth/callback", async (req, res) => {
       <p>Copy your refresh token and save it in your .env file as <code>AD_REFRESH_TOKEN=...</code></p>
     `);
   } catch (err) {
-    console.error(
-      "❌ Token exchange failed:",
-      err.response?.data || err.message
-    );
+    console.error("❌ Token exchange failed:", err.response?.data || err.message);
     return res.status(500).send(`
-  <h2>❌ Failed to exchange code for tokens.</h2>
-  <pre>${JSON.stringify(err.response?.data || err.message, null, 2)}</pre>
-`);
-    return res.status(500).send("❌ Failed to exchange code for tokens.");
+      <h2>❌ Failed to exchange code for tokens.</h2>
+      <pre>${JSON.stringify(err.response?.data || err.message, null, 2)}</pre>
+    `);
   }
 });
 
