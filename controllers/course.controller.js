@@ -8,6 +8,61 @@ const Course = require("../models/course.model");
 // Add to course.controller.js
 // Get all courses (simple list for dropdown)
 // Update course language content
+// View all courses content
+exports.viewAllCoursesContent = async (req, res) => {
+  try {
+    console.log('📚 Viewing all courses content');
+    
+    const courses = await Course.find({ isActive: true })
+      .select('languages availableLanguages')
+      .lean();
+    
+    const result = courses.map(course => ({
+      id: course._id,
+      availableLanguages: course.availableLanguages || [],
+      languages: {}
+    }));
+    
+    // Add language details
+    const languageNames = {
+      en: 'English',
+      ar: 'Arabic',
+      es: 'Spanish',
+      fr: 'French',
+      de: 'German',
+      zh: 'Chinese',
+      hi: 'Hindi',
+      ur: 'Urdu'
+    };
+    
+    courses.forEach((course, index) => {
+      if (course.languages) {
+        Object.keys(course.languages).forEach(lang => {
+          if (course.languages[lang] && course.languages[lang].courseName) {
+            result[index].languages[lang] = {
+              name: languageNames[lang] || lang,
+              courseName: course.languages[lang].courseName,
+              pagesCount: course.languages[lang].pages?.length || 0
+            };
+          }
+        });
+      }
+    });
+    
+    res.json({
+      success: true,
+      totalCourses: courses.length,
+      courses: result
+    });
+  } catch (error) {
+    console.error('Error viewing courses content:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error viewing courses content',
+      error: error.message
+    });
+  }
+};
 exports.updateCourseLanguage = async (req, res) => {
   try {
     const { courseId, language, content } = req.body;
