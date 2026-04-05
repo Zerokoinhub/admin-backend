@@ -3,8 +3,8 @@ const router = express.Router();
 const axios = require("axios");
 const qs = require("querystring");
 
-// ✅ FIXED: Path to controller (going up 2 levels from src/routes to root controllers)
-const admobController = require("../../controllers/admob.controller");
+// ✅ FIXED: Correct path - controllers folder is one level up from routes
+const admobController = require("../controllers/admob.controller");
 
 // Step 1: OAuth Redirect URI route — GET /api/admob/oauth/callback
 router.get("/oauth/callback", async (req, res) => {
@@ -32,7 +32,6 @@ router.get("/oauth/callback", async (req, res) => {
 
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
 
-    // For testing: return them in browser
     return res.status(200).send(`
       <h2>✅ Token Received!</h2>
       <p><strong>Access Token:</strong> ${access_token}</p>
