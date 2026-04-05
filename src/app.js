@@ -5,11 +5,11 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 require("dotenv").config();
 
-// ✅ FIXED: Routes are in root folder (outside src)
+// Routes
 const admobRoutes = require("../routes/admob.routes");
 const authRoutes = require("../routes/auth.routes");
 const userRoutes = require("../routes/user.routes");
-const courseRoutes = require("../routes/course.routes");
+const courseRoutes = require("../routes/course.routes");  // ✅ ADD THIS
 const pageRoutes = require("../routes/page.routes");
 const adminRoutes = require("../routes/admin.routes");
 const notificationRoutes = require("../routes/notification.routes");
@@ -49,7 +49,7 @@ app.options("*", cors());
 app.use(helmet());
 app.use(morgan("dev"));
 
-// ============ DATABASE CONNECTION ============
+// Database connection
 mongoose
   .connect(
     process.env.MONGODB_URI || "mongodb://localhost:27017/zerokoin-admin",
@@ -61,7 +61,7 @@ mongoose
   .then(() => console.log("✅ Connected to MongoDB"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-// ============ TEST ROUTES ============
+// Test routes
 app.get('/api/ping', (req, res) => {
   console.log('✅ PING received');
   res.json({ success: true, message: 'API is reachable', timestamp: new Date().toISOString() });
@@ -72,10 +72,10 @@ app.get('/api/test', (req, res) => {
   res.json({ success: true, message: 'API is working properly' });
 });
 
-// ============ MAIN ROUTES ============
+// ✅ MAIN ROUTES - Make sure all are uncommented
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/courses", courseRoutes);
+app.use("/api/courses", courseRoutes);  // ✅ THIS IS THE FIX
 app.use("/api/pages", pageRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationRoutes);
@@ -83,7 +83,7 @@ app.use("/api/transfer", transferRoutes);
 app.use("/api/admob", admobRoutes);
 app.use("/api/withdrawals", withdrawalRoutes);
 
-// ============ HEALTH CHECK ============
+// Health check
 app.get("/health", (req, res) => {
   res.status(200).json({
     status: "success",
@@ -92,7 +92,7 @@ app.get("/health", (req, res) => {
   });
 });
 
-// ============ 404 Handler ============
+// 404 Handler
 app.use((req, res) => {
   console.log(`❌ 404 - Route not found: ${req.method} ${req.url}`);
   res.status(404).json({
@@ -103,7 +103,7 @@ app.use((req, res) => {
   });
 });
 
-// ============ ERROR HANDLER ============
+// Error handler
 app.use((err, req, res, next) => {
   console.error('❌ Server error:', err.stack);
   res.status(500).json({
@@ -113,7 +113,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ============ START SERVER ============
+// Start server
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
@@ -122,6 +122,6 @@ app.listen(PORT, () => {
   console.log(`   GET  /api/test - Test API`);
   console.log(`   GET  /health - Health check`);
   console.log(`   GET  /api/users - Get all users`);
+  console.log(`   GET  /api/courses - Get all courses`);  // ✅ Now this will work
   console.log(`   POST /api/users/sync - Sync user`);
-  console.log(`   GET  /api/users/test - Test user routes`);
 });
