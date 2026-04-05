@@ -5,6 +5,7 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 require("dotenv").config();
 
+// ✅ Routes - correct paths since app.js is in src folder
 const admobRoutes = require("./routes/admob.routes");
 const authRoutes = require("./routes/auth.routes");
 const userRoutes = require("./routes/user.routes");
