@@ -9,6 +9,89 @@ const Course = require("../models/course.model");
 // Get all courses (simple list for dropdown)
 // Update course language content
 // View all courses content
+// Update course language content
+// Get all courses (simple list for dropdown)
+exports.getAllCourses = async (req, res) => {
+  try {
+    console.log('📚 Fetching all course names');
+    
+    const courses = await Course.find({ isActive: true })
+      .select('languages')
+      .lean();
+    
+    const courseNames = [];
+    
+    courses.forEach(course => {
+      if (course.languages) {
+        Object.values(course.languages).forEach(langContent => {
+          if (langContent && langContent.courseName) {
+            courseNames.push(langContent.courseName);
+          }
+        });
+      }
+    });
+    
+    const uniqueCourseNames = [...new Set(courseNames)];
+    
+    res.json({
+      success: true,
+      courseNames: uniqueCourseNames,
+      totalCourses: uniqueCourseNames.length
+    });
+  } catch (error) {
+    console.error('Error in getAllCourses:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching courses',
+      error: error.message
+    });
+  }
+};
+exports.updateCourseLanguage = async (req, res) => {
+  try {
+    const { courseId, language, content } = req.body;
+    
+    if (!courseId || !language || !content) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: courseId, language, content'
+      });
+    }
+    
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+    
+    // Update the language content
+    if (!course.languages) course.languages = {};
+    course.languages[language] = content;
+    
+    // Update available languages if needed
+    if (!course.availableLanguages) course.availableLanguages = [];
+    if (!course.availableLanguages.includes(language)) {
+      course.availableLanguages.push(language);
+    }
+    
+    await course.save();
+    
+    res.json({
+      success: true,
+      message: `Language ${language} updated successfully`,
+      course
+    });
+  } catch (error) {
+    console.error('Error updating course language:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating course language',
+      error: error.message
+    });
+  }
+};
 exports.viewAllCoursesContent = async (req, res) => {
   try {
     console.log('📚 Viewing all courses content');
