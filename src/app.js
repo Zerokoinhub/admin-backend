@@ -5,16 +5,16 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 require("dotenv").config();
 
-// ✅ Routes - correct paths since app.js is in src folder
-const admobRoutes = require("./routes/admob.routes");
-const authRoutes = require("./routes/auth.routes");
-const userRoutes = require("./routes/user.routes");
-const courseRoutes = require("./routes/course.routes");
-const pageRoutes = require("./routes/page.routes");
-const adminRoutes = require("./routes/admin.routes");
-const notificationRoutes = require("./routes/notification.routes");
-const transferRoutes = require("./routes/transfer.routes");
-const withdrawalRoutes = require("./routes/withdrawal.routes");
+// ✅ FIXED: Routes are in root folder (outside src)
+const admobRoutes = require("../routes/admob.routes");
+const authRoutes = require("../routes/auth.routes");
+const userRoutes = require("../routes/user.routes");
+const courseRoutes = require("../routes/course.routes");
+const pageRoutes = require("../routes/page.routes");
+const adminRoutes = require("../routes/admin.routes");
+const notificationRoutes = require("../routes/notification.routes");
+const transferRoutes = require("../routes/transfer.routes");
+const withdrawalRoutes = require("../routes/withdrawal.routes");
 
 const app = express();
 
@@ -61,7 +61,7 @@ mongoose
   .then(() => console.log("✅ Connected to MongoDB"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-// ============ TEST ROUTES (ADD THESE FIRST) ============
+// ============ TEST ROUTES ============
 app.get('/api/ping', (req, res) => {
   console.log('✅ PING received');
   res.json({ success: true, message: 'API is reachable', timestamp: new Date().toISOString() });
@@ -92,7 +92,7 @@ app.get("/health", (req, res) => {
   });
 });
 
-// ============ 404 Handler for undefined routes ============
+// ============ 404 Handler ============
 app.use((req, res) => {
   console.log(`❌ 404 - Route not found: ${req.method} ${req.url}`);
   res.status(404).json({
