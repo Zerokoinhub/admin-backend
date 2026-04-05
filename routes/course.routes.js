@@ -1,25 +1,21 @@
 const express = require('express');
+const courseController = require('../controllers/course.controller');
+
 const router = express.Router();
 
-// Simple working routes
-router.get('/', (req, res) => {
-  res.json({ success: true, message: "Courses API working" });
-});
+// ============ WORKING ROUTES ============
+router.get('/', courseController.getCourses);
+router.get('/all', courseController.getAllCoursesList);
+router.get('/all-simple', courseController.getAllCoursesSimple);
+router.get('/list-active', courseController.listAllActiveCourses);
+router.get('/structure', courseController.getCourseStructure);
+router.get('/language/:language', courseController.getCoursesByLanguage);
+router.get('/languages/available', courseController.getAvailableLanguages);
+router.get('/:id', courseController.getCourseById);
 
-router.get('/all', (req, res) => {
-  res.json({ success: true, courses: [] });
-});
-
-router.get('/language/:language', (req, res) => {
-  res.json({ success: true, courses: [] });
-});
-
-router.get('/:id', (req, res) => {
-  res.json({ success: true, message: "Course found" });
-});
-
-router.post('/', (req, res) => {
-  res.json({ success: true, message: "Course created" });
-});
+// ============ POST ROUTES ============
+router.post('/', courseController.uploadCourse);
+router.put('/:id', courseController.editCourse);
+router.delete('/:id', courseController.deleteCourse);
 
 module.exports = router;
