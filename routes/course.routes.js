@@ -14,6 +14,7 @@ router.get('/languages/available', courseController.getAvailableLanguages);
 router.get('/:id', courseController.getCourseById);
 
 // ============ POST ROUTES ============
+router.get('/debug/all', courseController.debugAllCourses);
 router.post('/', courseController.uploadCourse);
 router.put('/:id', courseController.editCourse);
 router.delete('/:id', courseController.deleteCourse);
