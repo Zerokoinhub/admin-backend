@@ -602,62 +602,100 @@ exports.debugCourseStructure = async (req, res) => {
 };
 exports.uploadCourse = async (req, res) => {
   try {
-    const { languages, uploadedBy } = req.body;
+    let { languages, uploadedBy, courseName, pages, language, name, description, title, content } = req.body;
 
-    // Validation: Check if at least one language has content
-    if (!languages || Object.keys(languages).length === 0 || !uploadedBy) {
+    console.log('📚 Received course data:', JSON.stringify(req.body, null, 2));
+
+    // ✅ Handle multiple possible formats
+    if (!languages) {
+      languages = {};
+      
+      // Format 1: { courseName, pages, language }
+      if (courseName && pages) {
+        const lang = language || 'en';
+        languages[lang] = {
+          courseName: courseName,
+          pages: pages
+        };
+        console.log('📚 Converted from format 1 (courseName/pages)');
+      }
+      // Format 2: { name, description, content }
+      else if (name && description) {
+        const lang = language || 'en';
+        languages[lang] = {
+          courseName: name,
+          pages: [{
+            title: description,
+            content: content || description,
+            time: "120"
+          }]
+        };
+        console.log('📚 Converted from format 2 (name/description)');
+      }
+      // Format 3: { title, content }
+      else if (title && content) {
+        const lang = language || 'en';
+        languages[lang] = {
+          courseName: title,
+          pages: [{
+            title: title,
+            content: content,
+            time: "120"
+          }]
+        };
+        console.log('📚 Converted from format 3 (title/content)');
+      }
+    }
+
+    // Validation
+    if (!languages || Object.keys(languages).length === 0) {
       return res.status(400).json({ 
         success: false, 
-        message: "Missing required fields. At least one language content is required." 
+        message: "Missing required fields. At least one language content is required.",
+        received: req.body
       });
     }
 
-    // Find the first language that has content (any language, not necessarily English)
-    const firstLanguage = Object.keys(languages).find(
-      lang => languages[lang] && languages[lang].courseName
-    );
-    
-    if (!firstLanguage) {
+    // Get first language that has content
+    const firstLang = Object.keys(languages).find(lang => languages[lang]?.courseName);
+    if (!firstLang) {
       return res.status(400).json({ 
         success: false, 
         message: "At least one language must have a course name" 
       });
     }
 
-    // Validate that the first found language has pages
-    const firstLangData = languages[firstLanguage];
-    if (!firstLangData.courseName || !Array.isArray(firstLangData.pages)) {
+    // Validate pages
+    const firstLangData = languages[firstLang];
+    if (!firstLangData.pages || !Array.isArray(firstLangData.pages) || firstLangData.pages.length === 0) {
       return res.status(400).json({ 
         success: false, 
-        message: "Course name and pages are required for at least one language" 
+        message: "At least one page is required" 
       });
     }
 
-    // Filter out empty languages
-    const filteredLanguages = {};
-    const supportedLanguages = ['en', 'es', 'fr', 'de', 'zh', 'ar', 'hi', 'ur'];
-    
-    supportedLanguages.forEach(lang => {
-      if (languages[lang] && languages[lang].courseName) {
-        filteredLanguages[lang] = languages[lang];
-      }
-    });
+    // Set uploadedBy
+    if (!uploadedBy) {
+      uploadedBy = req.user?._id || "67c0b5f8e4b0d5a1b2c3d4e5";
+    }
 
     const course = new Course({
-      languages: filteredLanguages,
-      uploadedBy,
-      isActive: true
+      languages: languages,
+      uploadedBy: uploadedBy,
+      isActive: true,
+      availableLanguages: Object.keys(languages)
     });
 
     await course.save();
-    
-    // Populate uploadedBy
-    await course.populate('uploadedBy', 'username email');
 
     res.status(201).json({ 
       success: true, 
       message: "Course uploaded successfully",
-      course 
+      course: {
+        id: course._id,
+        languages: course.languages,
+        availableLanguages: course.availableLanguages
+      }
     });
   } catch (error) {
     console.error("Error uploading course:", error);
@@ -667,9 +705,7 @@ exports.uploadCourse = async (req, res) => {
       error: error.message,
     });
   }
-};
-
-// Edit/update an existing course - FIXED: No longer requires English
+};// Edit/update an existing course - FIXED: No longer requires English
 exports.editCourse = async (req, res) => {
   try {
     const { id } = req.params;
