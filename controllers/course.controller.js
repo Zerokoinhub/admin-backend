@@ -12,6 +12,90 @@ const Course = require("../models/course.model");
 // Update course language content
 // Get all courses (simple list for dropdown)
 // Debug endpoint to check all courses
+// Add Arabic content to a specific course
+exports.addArabicContent = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { arabicContent } = req.body;
+    
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({ success: false, message: "Course not found" });
+    }
+    
+    course.languages.ar = arabicContent;
+    if (!course.availableLanguages.includes('ar')) {
+      course.availableLanguages.push('ar');
+    }
+    
+    await course.save();
+    
+    res.json({ success: true, message: "Arabic content added successfully", course });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Add Arabic to all existing courses
+exports.addArabicToExistingCourses = async (req, res) => {
+  try {
+    const { arabicContent } = req.body;
+    const courses = await Course.find({});
+    
+    for (const course of courses) {
+      course.languages.ar = arabicContent;
+      if (!course.availableLanguages.includes('ar')) {
+        course.availableLanguages.push('ar');
+      }
+      await course.save();
+    }
+    
+    res.json({ success: true, message: `Arabic content added to ${courses.length} courses` });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Add Arabic to existing courses direct
+exports.addArabicToExistingCoursesDirect = async (req, res) => {
+  try {
+    const { arabicContent } = req.body;
+    const result = await Course.updateMany(
+      {},
+      { 
+        $set: { 'languages.ar': arabicContent },
+        $addToSet: { availableLanguages: 'ar' }
+      }
+    );
+    
+    res.json({ success: true, message: `Updated ${result.modifiedCount} courses` });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Create course with both languages
+exports.createCourseWithBothLanguages = async (req, res) => {
+  try {
+    const { englishContent, arabicContent, uploadedBy } = req.body;
+    
+    const course = new Course({
+      languages: {
+        en: englishContent,
+        ar: arabicContent
+      },
+      uploadedBy: uploadedBy,
+      isActive: true,
+      availableLanguages: ['en', 'ar']
+    });
+    
+    await course.save();
+    
+    res.status(201).json({ success: true, message: "Course created with both languages", course });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
 exports.debugAllCourses = async (req, res) => {
   try {
     const courses = await Course.find({});
