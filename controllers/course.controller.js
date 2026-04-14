@@ -301,34 +301,39 @@ exports.getAllCourses = async (req, res) => {
   try {
     console.log('📚 Fetching all course names');
     
-    // Find all active courses
-    const courses = await Course.find({ isActive: true })
-      .select('languages availableLanguages')
+    // DON'T filter by isActive - get ALL courses
+    const courses = await Course.find({})
+      .select('languages isActive')
       .lean();
     
-    // Extract course names from all available languages
+    console.log(`📚 Found ${courses.length} total courses in database`);
+    
     const courseNames = [];
     
     courses.forEach(course => {
+      console.log(`Processing course ID: ${course._id}, isActive: ${course.isActive}`);
+      
       if (course.languages) {
-        // Add course names from each language
-        Object.values(course.languages).forEach(langContent => {
+        // Check all languages
+        Object.keys(course.languages).forEach(lang => {
+          const langContent = course.languages[lang];
           if (langContent && langContent.courseName) {
-            courseNames.push(langContent.courseName);
+            const name = langContent.courseName;
+            if (!courseNames.includes(name)) {
+              courseNames.push(name);
+              console.log(`✅ Added course: ${name} from language: ${lang}`);
+            }
           }
         });
       }
     });
     
-    // Remove duplicates
-    const uniqueCourseNames = [...new Set(courseNames)];
-    
-    console.log(`✅ Found ${uniqueCourseNames.length} unique course names`);
+    console.log(`✅ Total unique course names: ${courseNames.length}`);
     
     res.json({
       success: true,
-      courseNames: uniqueCourseNames,
-      totalCourses: uniqueCourseNames.length
+      courseNames: courseNames,
+      totalCourses: courseNames.length
     });
   } catch (error) {
     console.error('Error in getAllCourses:', error);
@@ -338,8 +343,7 @@ exports.getAllCourses = async (req, res) => {
       error: error.message
     });
   }
-};
-const syncFirebaseUser = async (req, res) => {
+};const syncFirebaseUser = async (req, res) => {
     try {
         console.log('🔄 SYNC endpoint hit!');
         console.log('Headers:', req.headers);
@@ -779,18 +783,30 @@ exports.editCourse = async (req, res) => {
 // Get all courses
 exports.getCourses = async (req, res) => {
   try {
-    const courses = await Course.find()
+    // DON'T filter by isActive - get ALL courses
+    const courses = await Course.find({})
       .populate('uploadedBy', 'username email')
       .sort('-createdAt');
+
+    console.log(`📚 Found ${courses.length} total courses`);
 
     // Transform courses for frontend
     const transformedCourses = courses.map(course => {
       const courseObj = course.toObject();
+      
+      // Get primary name from first available language
+      let primaryName = 'Untitled';
+      if (courseObj.languages) {
+        const firstLang = Object.keys(courseObj.languages)[0];
+        if (firstLang && courseObj.languages[firstLang]?.courseName) {
+          primaryName = courseObj.languages[firstLang].courseName;
+        }
+      }
+      
       return {
         ...courseObj,
-        // Add helper fields for display
-        primaryName: courseObj.languages?.en?.courseName || 'Untitled',
-        languageCount: courseObj.availableLanguages?.length || 0,
+        primaryName: primaryName,
+        languageCount: courseObj.availableLanguages?.length || Object.keys(courseObj.languages || {}).length,
         hasMultipleLanguages: (courseObj.availableLanguages?.length || 0) > 1
       };
     });
@@ -807,9 +823,7 @@ exports.getCourses = async (req, res) => {
       error: error.message,
     });
   }
-};
-
-// Get course by ID
+};// Get course by ID
 // Get course by ID
 // Get course by ID
 // Get course by ID
