@@ -119,30 +119,49 @@ exports.debugAllCourses = async (req, res) => {
 };
 exports.getAllCourses = async (req, res) => {
   try {
-    console.log('📚 Fetching all course names');
+    console.log('📚 Fetching all course names - NO FILTERING');
     
-    const courses = await Course.find({ isActive: true })
-      .select('languages')
+    // ✅ DON'T filter by isActive - get ALL courses from database
+    const courses = await Course.find({})
+      .select('languages isActive')
       .lean();
+    
+    console.log(`📚 Found ${courses.length} total courses in database`);
     
     const courseNames = [];
     
     courses.forEach(course => {
+      console.log(`Processing course ID: ${course._id}, isActive: ${course.isActive}`);
+      
       if (course.languages) {
-        Object.values(course.languages).forEach(langContent => {
+        // Check all languages
+        Object.keys(course.languages).forEach(lang => {
+          const langContent = course.languages[lang];
           if (langContent && langContent.courseName) {
-            courseNames.push(langContent.courseName);
+            const name = langContent.courseName;
+            if (!courseNames.includes(name)) {
+              courseNames.push(name);
+              console.log(`✅ Added course: ${name} from language: ${lang}`);
+            }
           }
         });
+      } else if (course.courseName) {
+        // Fallback for courses with direct courseName field
+        const name = course.courseName;
+        if (!courseNames.includes(name)) {
+          courseNames.push(name);
+          console.log(`✅ Added course (direct): ${name}`);
+        }
       }
     });
     
-    const uniqueCourseNames = [...new Set(courseNames)];
+    console.log(`✅ Total unique course names: ${courseNames.length}`);
+    console.log(`📚 Course names: ${courseNames.join(', ')}`);
     
     res.json({
       success: true,
-      courseNames: uniqueCourseNames,
-      totalCourses: uniqueCourseNames.length
+      courseNames: courseNames,
+      totalCourses: courseNames.length
     });
   } catch (error) {
     console.error('Error in getAllCourses:', error);
@@ -152,8 +171,7 @@ exports.getAllCourses = async (req, res) => {
       error: error.message
     });
   }
-};
-exports.updateCourseLanguage = async (req, res) => {
+};exports.updateCourseLanguage = async (req, res) => {
   try {
     const { courseId, language, content } = req.body;
     
@@ -783,14 +801,13 @@ exports.editCourse = async (req, res) => {
 // Get all courses
 exports.getCourses = async (req, res) => {
   try {
-    // DON'T filter by isActive - get ALL courses
+    // ✅ DON'T filter by isActive - get ALL courses
     const courses = await Course.find({})
       .populate('uploadedBy', 'username email')
       .sort('-createdAt');
 
-    console.log(`📚 Found ${courses.length} total courses`);
+    console.log(`📚 Found ${courses.length} total courses in database`);
 
-    // Transform courses for frontend
     const transformedCourses = courses.map(course => {
       const courseObj = course.toObject();
       
@@ -801,6 +818,8 @@ exports.getCourses = async (req, res) => {
         if (firstLang && courseObj.languages[firstLang]?.courseName) {
           primaryName = courseObj.languages[firstLang].courseName;
         }
+      } else if (courseObj.courseName) {
+        primaryName = courseObj.courseName;
       }
       
       return {
@@ -823,11 +842,7 @@ exports.getCourses = async (req, res) => {
       error: error.message,
     });
   }
-};// Get course by ID
-// Get course by ID
-// Get course by ID
-// Get course by ID
-exports.getCourseById = async (req, res) => {
+};exports.getCourseById = async (req, res) => {
   try {
     const { id } = req.params;
     const { lang = 'en' } = req.query;
