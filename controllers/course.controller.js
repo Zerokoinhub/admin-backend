@@ -121,9 +121,8 @@ exports.getAllCourses = async (req, res) => {
   try {
     console.log('📚 Fetching all course names - NO FILTERING');
     
-    // ✅ DON'T filter by isActive - get ALL courses from database
+    // Get ALL courses without any filters
     const courses = await Course.find({})
-      .select('languages isActive')
       .lean();
     
     console.log(`📚 Found ${courses.length} total courses in database`);
@@ -131,32 +130,36 @@ exports.getAllCourses = async (req, res) => {
     const courseNames = [];
     
     courses.forEach(course => {
-      console.log(`Processing course ID: ${course._id}, isActive: ${course.isActive}`);
+      console.log(`Processing course ID: ${course._id}`);
+      console.log(`  - Direct courseName: ${course.courseName || 'none'}`);
+      console.log(`  - Languages: ${Object.keys(course.languages || {})}`);
       
+      // Check for direct courseName field (for old courses)
+      if (course.courseName && course.courseName.toString().trim() !== '') {
+        const name = course.courseName.toString();
+        if (!courseNames.includes(name)) {
+          courseNames.push(name);
+          console.log(`✅ Added course from direct field: ${name}`);
+        }
+      }
+      
+      // Check for languages object (for new courses)
       if (course.languages) {
-        // Check all languages
         Object.keys(course.languages).forEach(lang => {
           const langContent = course.languages[lang];
           if (langContent && langContent.courseName) {
             const name = langContent.courseName;
             if (!courseNames.includes(name)) {
               courseNames.push(name);
-              console.log(`✅ Added course: ${name} from language: ${lang}`);
+              console.log(`✅ Added course from languages.${lang}: ${name}`);
             }
           }
         });
-      } else if (course.courseName) {
-        // Fallback for courses with direct courseName field
-        const name = course.courseName;
-        if (!courseNames.includes(name)) {
-          courseNames.push(name);
-          console.log(`✅ Added course (direct): ${name}`);
-        }
       }
     });
     
     console.log(`✅ Total unique course names: ${courseNames.length}`);
-    console.log(`📚 Course names: ${courseNames.join(', ')}`);
+    console.log(`📚 Final course list: ${courseNames.join(', ')}`);
     
     res.json({
       success: true,
@@ -171,7 +174,8 @@ exports.getAllCourses = async (req, res) => {
       error: error.message
     });
   }
-};exports.updateCourseLanguage = async (req, res) => {
+};
+exports.updateCourseLanguage = async (req, res) => {
   try {
     const { courseId, language, content } = req.body;
     
