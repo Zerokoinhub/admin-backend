@@ -263,47 +263,37 @@ exports.updateCourseLanguage = async (req, res) => {
 };
 exports.getAllCourses = async (req, res) => {
   try {
-    console.log('📚 Fetching all course names - NO FILTERING');
+    console.log('📚 Fetching all course names - PRIMARY ONLY');
     
-    // Get ALL courses without any filters
-    const courses = await Course.find({})
-      .lean();
-    
-    console.log(`📚 Found ${courses.length} total courses in database`);
+    const courses = await Course.find({ isActive: true }).lean();
     
     const courseNames = [];
     
     courses.forEach(course => {
-      console.log(`Processing course ID: ${course._id}`);
-      console.log(`  - Direct courseName: ${course.courseName || 'none'}`);
-      console.log(`  - Languages: ${Object.keys(course.languages || {})}`);
+      // ✅ ONLY get the PRIMARY/ENGLISH name, NOT all languages
+      let primaryName = null;
       
-      // Check for direct courseName field (for old courses)
-      if (course.courseName && course.courseName.toString().trim() !== '') {
-        const name = course.courseName.toString();
-        if (!courseNames.includes(name)) {
-          courseNames.push(name);
-          console.log(`✅ Added course from direct field: ${name}`);
-        }
+      // Priority 1: Get from languages.en
+      if (course.languages && course.languages.en && course.languages.en.courseName) {
+        primaryName = course.languages.en.courseName;
+      }
+      // Priority 2: Get from primaryName field
+      else if (course.primaryName && course.primaryName.trim()) {
+        primaryName = course.primaryName;
+      }
+      // Priority 3: Get from direct courseName field
+      else if (course.courseName && course.courseName.trim()) {
+        primaryName = course.courseName;
       }
       
-      // Check for languages object (for new courses)
-      if (course.languages) {
-        Object.keys(course.languages).forEach(lang => {
-          const langContent = course.languages[lang];
-          if (langContent && langContent.courseName) {
-            const name = langContent.courseName;
-            if (!courseNames.includes(name)) {
-              courseNames.push(name);
-              console.log(`✅ Added course from languages.${lang}: ${name}`);
-            }
-          }
-        });
+      // Add only if not already added
+      if (primaryName && !courseNames.includes(primaryName)) {
+        courseNames.push(primaryName);
+        console.log(`✅ Added course: ${primaryName}`);
       }
     });
     
-    console.log(`✅ Total unique course names: ${courseNames.length}`);
-    console.log(`📚 Final course list: ${courseNames.join(', ')}`);
+    console.log(`✅ Total unique courses: ${courseNames.length}`);
     
     res.json({
       success: true,
@@ -311,11 +301,11 @@ exports.getAllCourses = async (req, res) => {
       totalCourses: courseNames.length
     });
   } catch (error) {
-    console.error('Error in getAllCourses:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching courses',
-      error: error.message
+    console.error('Get courses error:', error.message);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching courses', 
+      error: error.message 
     });
   }
 };
