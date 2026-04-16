@@ -1,3 +1,11 @@
+// Add this at the very beginning, before all other routes
+router.get('/test', (req, res) => {
+  res.json({ success: true, message: 'Routes are working!' });
+});
+
+router.get('/language-test/:lang', (req, res) => {
+  res.json({ success: true, language: req.params.lang, message: 'Language route is working!' });
+});
 const express = require('express');
 const courseController = require('../controllers/course.controller');
 
