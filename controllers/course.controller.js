@@ -261,16 +261,19 @@ exports.updateCourseLanguage = async (req, res) => {
     });
   }
 };
+// Get all course names (for dropdown) - RETURN ONLY PRIMARY/ENGLISH NAMES
 exports.getAllCourses = async (req, res) => {
   try {
     console.log('📚 Fetching all course names - PRIMARY ONLY');
     
-    const courses = await Course.find({ isActive: true }).lean();
+    const courses = await Course.find({ isActive: true })
+      .select('courseName languages primaryName')
+      .lean();
     
     const courseNames = [];
     
     courses.forEach(course => {
-      // ✅ ONLY get the PRIMARY/ENGLISH name, NOT all languages
+      // ✅ ONLY get the English/primary name
       let primaryName = null;
       
       // Priority 1: Get from languages.en
@@ -286,16 +289,20 @@ exports.getAllCourses = async (req, res) => {
         primaryName = course.courseName;
       }
       
-      // Add only if not already added
+      // Add only if not already added and if it's English (not Arabic)
       if (primaryName && !courseNames.includes(primaryName)) {
-        courseNames.push(primaryName);
-        console.log(`✅ Added course: ${primaryName}`);
+        // Skip Arabic course names
+        const hasArabic = /[\u0600-\u06FF]/.test(primaryName);
+        if (!hasArabic) {
+          courseNames.push(primaryName);
+          console.log(`✅ Added course: ${primaryName}`);
+        }
       }
     });
     
-    console.log(`✅ Total unique courses: ${courseNames.length}`);
+    console.log(`✅ Total unique English courses: ${courseNames.length}`);
     
-    res.json({
+    res.status(200).json({ 
       success: true,
       courseNames: courseNames,
       totalCourses: courseNames.length
