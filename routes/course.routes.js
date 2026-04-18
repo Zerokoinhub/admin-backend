@@ -1,4 +1,9 @@
-// Add this at the very beginning, before all other routes
+const express = require('express');
+const courseController = require('../controllers/course.controller');
+
+const router = express.Router();
+
+// ============ TEST ROUTES (Add at the beginning for debugging) ============
 router.get('/test', (req, res) => {
   res.json({ success: true, message: 'Routes are working!' });
 });
@@ -6,10 +11,6 @@ router.get('/test', (req, res) => {
 router.get('/language-test/:lang', (req, res) => {
   res.json({ success: true, language: req.params.lang, message: 'Language route is working!' });
 });
-const express = require('express');
-const courseController = require('../controllers/course.controller');
-
-const router = express.Router();
 
 // ============ GET ROUTES ============
 router.get('/', courseController.getCourses);
