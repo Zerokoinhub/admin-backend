@@ -9,7 +9,7 @@ require("dotenv").config();
 const admobRoutes = require("../routes/admob.routes");
 const authRoutes = require("../routes/auth.routes");
 const userRoutes = require("../routes/user.routes");
-const courseRoutes = require("../routes/course.routes");  // ✅ ADD THIS
+const courseRoutes = require("../routes/course.routes");
 const pageRoutes = require("../routes/page.routes");
 const adminRoutes = require("../routes/admin.routes");
 const notificationRoutes = require("../routes/notification.routes");
@@ -22,31 +22,65 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS configuration
+// ============ CORS CONFIGURATION (FIXED) ============
 const allowedOrigins = [
   "https://admin.zerokoin.com",
   "https://admin-frontend-jet-eta.vercel.app",
   "http://localhost:3000",
   "http://localhost:3001",
   "https://admin.zerokoin.com/api/admob/oauth/callback",
+  "https://admin-backend-production-4ff2.up.railway.app",
+  "https://zerokoinapp-production.up.railway.app",
+  "https://zerokoin.com",
+  "http://localhost:3002"
 ];
 
+// CORS middleware with full configuration
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow requests with no origin (like mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         console.log('❌ Blocked by CORS:', origin);
-        callback(new Error("Not allowed by CORS"));
+        callback(null, false);
       }
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    exposedHeaders: ['Content-Length', 'X-Requested-With'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204
   })
 );
-app.options("*", cors());
 
-app.use(helmet());
+// Handle preflight requests explicitly
+app.options('*', cors());
+
+// Additional CORS headers middleware
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Security and logging
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(morgan("dev"));
 
 // Database connection
@@ -61,21 +95,32 @@ mongoose
   .then(() => console.log("✅ Connected to MongoDB"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-// Test routes
+// ============ TEST ENDPOINTS ============
 app.get('/api/ping', (req, res) => {
-  console.log('✅ PING received');
+  console.log('✅ PING received from:', req.headers.origin);
   res.json({ success: true, message: 'API is reachable', timestamp: new Date().toISOString() });
 });
 
 app.get('/api/test', (req, res) => {
-  console.log('✅ TEST endpoint hit');
+  console.log('✅ TEST endpoint hit from:', req.headers.origin);
   res.json({ success: true, message: 'API is working properly' });
 });
 
-// ✅ MAIN ROUTES - Make sure all are uncommented
+// CORS test endpoint
+app.get('/api/cors-test', (req, res) => {
+  console.log('✅ CORS test from:', req.headers.origin);
+  res.json({ 
+    success: true, 
+    message: 'CORS is working!',
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ============ MAIN ROUTES ============
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/courses", courseRoutes);  // ✅ THIS IS THE FIX
+app.use("/api/courses", courseRoutes);
 app.use("/api/pages", pageRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationRoutes);
@@ -92,7 +137,48 @@ app.get("/health", (req, res) => {
   });
 });
 
-// 404 Handler
+// ============ USER ENDPOINTS (Direct for testing) ============
+app.get('/api/users/all', async (req, res) => {
+  try {
+    const User = require('../models/User');
+    const users = await User.find({}).select('email name balance isActive role');
+    console.log(`📊 Total users: ${users.length}`);
+    res.json({ success: true, count: users.length, users });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/users', async (req, res) => {
+  try {
+    const { page = 1, limit = 100 } = req.query;
+    const User = require('../models/User');
+    
+    const users = await User.find({})
+      .select('email name balance isActive role photoURL createdAt')
+      .skip((parseInt(page) - 1) * parseInt(limit))
+      .limit(parseInt(limit))
+      .sort({ createdAt: -1 });
+    
+    const total = await User.countDocuments();
+    
+    res.json({ 
+      success: true, 
+      users,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalUsers: total
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============ 404 HANDLER ============
 app.use((req, res) => {
   console.log(`❌ 404 - Route not found: ${req.method} ${req.url}`);
   res.status(404).json({
@@ -103,7 +189,7 @@ app.use((req, res) => {
   });
 });
 
-// Error handler
+// ============ ERROR HANDLER ============
 app.use((err, req, res, next) => {
   console.error('❌ Server error:', err.stack);
   res.status(500).json({
@@ -113,15 +199,21 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
+// ============ START SERVER ============
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`\n🚀 Admin Backend Server is running on port ${PORT}`);
   console.log(`📡 Available endpoints:`);
   console.log(`   GET  /api/ping - Test API`);
   console.log(`   GET  /api/test - Test API`);
+  console.log(`   GET  /api/cors-test - CORS Test`);
   console.log(`   GET  /health - Health check`);
-  console.log(`   GET  /api/users - Get all users`);
-  console.log(`   GET  /api/courses - Get all courses`);  // ✅ Now this will work
+  console.log(`   GET  /api/users - Get all users (paginated)`);
+  console.log(`   GET  /api/users/all - Get all users`);
+  console.log(`   GET  /api/courses - Get all courses`);
   console.log(`   POST /api/users/sync - Sync user`);
+  console.log(`\n✅ CORS Allowed Origins:`);
+  allowedOrigins.forEach(origin => console.log(`   - ${origin}`));
+  console.log(`\n🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐 CORS Mode: Production (restricted)`);
 });
