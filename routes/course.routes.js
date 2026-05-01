@@ -3,7 +3,7 @@ const courseController = require('../controllers/course.controller');
 
 const router = express.Router();
 
-// ============ TEST ROUTES (Add at the beginning for debugging) ============
+// ============ TEST ROUTES ============
 router.get('/test', (req, res) => {
   res.json({ success: true, message: 'Routes are working!' });
 });
@@ -12,8 +12,17 @@ router.get('/language-test/:lang', (req, res) => {
   res.json({ success: true, language: req.params.lang, message: 'Language route is working!' });
 });
 
-// ============ GET ROUTES ============
-router.get('/', courseController.getCourses);
+// ============ POST/PUT/DELETE ROUTES (MUST COME FIRST) ============
+router.post('/', courseController.uploadCourse);
+router.post('/update-language', courseController.updateCourseLanguage);
+router.post('/add-arabic/:courseId', courseController.addArabicContent);
+router.post('/add-arabic-to-all', courseController.addArabicToExistingCourses);
+router.post('/add-arabic-direct', courseController.addArabicToExistingCoursesDirect);
+router.post('/create-all', courseController.createCourseWithBothLanguages);
+router.put('/:id', courseController.editCourse);
+router.delete('/:id', courseController.deleteCourse);
+
+// ============ GET ROUTES (Specific paths first) ============
 router.get('/all', courseController.getAllCourses);
 router.get('/all-simple', courseController.getAllCoursesSimple);
 router.get('/list-all', courseController.getAllCoursesList);
@@ -26,18 +35,9 @@ router.get('/debug/:courseName', courseController.debugCourseStructure);
 router.get('/by-name/:name', courseController.getCourseByName);
 router.get('/language/:language', courseController.getCoursesByLanguage);
 router.get('/languages/available', courseController.getAvailableLanguages);
+router.get('/', courseController.getCourses);
 
-// ============ DYNAMIC ID ROUTE (MUST BE LAST GET ROUTE) ============
+// ============ DYNAMIC ID ROUTE (MUST BE ABSOLUTELY LAST) ============
 router.get('/:id', courseController.getCourseById);
-
-// ============ POST/PUT/DELETE ROUTES ============
-router.post('/', courseController.uploadCourse);
-router.post('/update-language', courseController.updateCourseLanguage);
-router.post('/add-arabic/:courseId', courseController.addArabicContent);
-router.post('/add-arabic-to-all', courseController.addArabicToExistingCourses);
-router.post('/add-arabic-direct', courseController.addArabicToExistingCoursesDirect);
-router.post('/create-all', courseController.createCourseWithBothLanguages);
-router.put('/:id', courseController.editCourse);
-router.delete('/:id', courseController.deleteCourse);
 
 module.exports = router;
