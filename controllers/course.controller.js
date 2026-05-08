@@ -598,27 +598,24 @@ exports.debugCourseStructure = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+// admin-backend/controllers/course.controller.js
 exports.uploadCourse = async (req, res) => {
   try {
     let { languages, uploadedBy, courseName, pages, language, name, description, title, content } = req.body;
 
     console.log('📚 Received course data:', JSON.stringify(req.body, null, 2));
 
-    // ✅ Handle multiple possible formats
+    // Handle multiple possible formats
     if (!languages) {
       languages = {};
       
-      // Format 1: { courseName, pages, language }
       if (courseName && pages) {
         const lang = language || 'en';
         languages[lang] = {
           courseName: courseName,
           pages: pages
         };
-        console.log('📚 Converted from format 1 (courseName/pages)');
-      }
-      // Format 2: { name, description, content }
-      else if (name && description) {
+      } else if (name && description) {
         const lang = language || 'en';
         languages[lang] = {
           courseName: name,
@@ -628,10 +625,7 @@ exports.uploadCourse = async (req, res) => {
             time: "120"
           }]
         };
-        console.log('📚 Converted from format 2 (name/description)');
-      }
-      // Format 3: { title, content }
-      else if (title && content) {
+      } else if (title && content) {
         const lang = language || 'en';
         languages[lang] = {
           courseName: title,
@@ -641,20 +635,17 @@ exports.uploadCourse = async (req, res) => {
             time: "120"
           }]
         };
-        console.log('📚 Converted from format 3 (title/content)');
       }
     }
 
-    // Validation
     if (!languages || Object.keys(languages).length === 0) {
       return res.status(400).json({ 
         success: false, 
         message: "Missing required fields. At least one language content is required.",
-        received: req.body
       });
     }
 
-    // Get first language that has content
+    // Validate at least one language has content
     const firstLang = Object.keys(languages).find(lang => languages[lang]?.courseName);
     if (!firstLang) {
       return res.status(400).json({ 
@@ -663,7 +654,6 @@ exports.uploadCourse = async (req, res) => {
       });
     }
 
-    // Validate pages
     const firstLangData = languages[firstLang];
     if (!firstLangData.pages || !Array.isArray(firstLangData.pages) || firstLangData.pages.length === 0) {
       return res.status(400).json({ 
@@ -672,7 +662,15 @@ exports.uploadCourse = async (req, res) => {
       });
     }
 
-    // Set uploadedBy
+    // ✅ Set availableLanguages from provided languages
+    const availableLangs = [];
+    const allSupportedLangs = ['en', 'hi', 'ur', 'ar', 'es'];
+    for (const lang of allSupportedLangs) {
+      if (languages[lang] && languages[lang].courseName && languages[lang].courseName.trim()) {
+        availableLangs.push(lang);
+      }
+    }
+
     if (!uploadedBy) {
       uploadedBy = req.user?._id || "67c0b5f8e4b0d5a1b2c3d4e5";
     }
@@ -681,7 +679,7 @@ exports.uploadCourse = async (req, res) => {
       languages: languages,
       uploadedBy: uploadedBy,
       isActive: true,
-      availableLanguages: Object.keys(languages)
+      availableLanguages: availableLangs
     });
 
     await course.save();
@@ -703,13 +701,15 @@ exports.uploadCourse = async (req, res) => {
       error: error.message,
     });
   }
-};// Edit/update an existing course - FIXED: No longer requires English
+};
 // admin-backend/controllers/course.controller.js
 
 exports.editCourse = async (req, res) => {
   try {
     const { id } = req.params;
     const { languages } = req.body;
+
+    console.log('📚 Received languages for update:', Object.keys(languages || {}));
 
     if (!languages || Object.keys(languages).length === 0) {
       return res.status(400).json({
@@ -726,22 +726,38 @@ exports.editCourse = async (req, res) => {
       });
     }
 
-    // ✅ Update languages
-    course.languages = languages;
+    // ✅ MERGE languages (preserve existing, add new)
+    const mergedLanguages = { ...course.languages };
     
-    // ✅ IMPORTANT: Update availableLanguages from the languages object keys
-    course.availableLanguages = Object.keys(languages).filter(lang => 
-      languages[lang] && languages[lang].courseName && languages[lang].courseName.trim()
-    );
+    // List of all supported languages
+    const allLanguages = ['en', 'hi', 'ur', 'ar', 'es'];
+    
+    // Update with new data
+    for (const lang of allLanguages) {
+      if (languages[lang] && languages[lang].courseName) {
+        mergedLanguages[lang] = languages[lang];
+        console.log(`✅ Updated ${lang} language: ${languages[lang].courseName}`);
+      }
+    }
+    
+    course.languages = mergedLanguages;
+    
+    // ✅ AUTO-DETECT available languages (only those with valid courseName)
+    const availableLangs = [];
+    for (const lang of allLanguages) {
+      if (course.languages[lang] && course.languages[lang].courseName && course.languages[lang].courseName.trim()) {
+        availableLangs.push(lang);
+      }
+    }
+    course.availableLanguages = availableLangs;
+    
+    console.log('📊 Available languages after update:', availableLangs);
     
     // Set primary course name
-    if (languages.en && languages.en.courseName) {
-      course.courseName = languages.en.courseName;
-    } else {
-      const firstLang = Object.keys(languages)[0];
-      if (firstLang && languages[firstLang].courseName) {
-        course.courseName = languages[firstLang].courseName;
-      }
+    if (course.languages.en && course.languages.en.courseName) {
+      course.courseName = course.languages.en.courseName;
+    } else if (availableLangs.length > 0) {
+      course.courseName = course.languages[availableLangs[0]].courseName;
     }
     
     course.updatedAt = new Date();
@@ -766,7 +782,7 @@ exports.editCourse = async (req, res) => {
       error: error.message,
     });
   }
-};// Get all courses
+};
 // Get all courses - WITH ALL LANGUAGES
 exports.getCourses = async (req, res) => {
   try {
