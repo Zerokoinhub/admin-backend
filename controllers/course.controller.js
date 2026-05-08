@@ -474,38 +474,45 @@ exports.getAllCoursesList = async (req, res) => {
   }
 };// admin-backend/controllers/course.controller.js
 
+// admin-backend/controllers/course.controller.js
+
 exports.listAllActiveCourses = async (req, res) => {
   try {
-    console.log('📚 Listing all active courses');
+    console.log('📚 Listing all active courses - FULL VERSION');
     
     const courses = await Course.find({ isActive: true })
       .select('_id languages availableLanguages isActive')
       .lean();
     
-    const result = courses.map(course => ({
-      id: course._id,
-      isActive: course.isActive,
-      availableLanguages: course.availableLanguages || [],
-      englishName: course.languages?.en?.courseName || null,
-      hindiName: course.languages?.hi?.courseName || null,
-      urduName: course.languages?.ur?.courseName || null,
-      arabicName: course.languages?.ar?.courseName || null,
-      spanishName: course.languages?.es?.courseName || null,
-      hasEnglish: !!course.languages?.en?.courseName,
-      hasHindi: !!course.languages?.hi?.courseName,
-      hasUrdu: !!course.languages?.ur?.courseName,
-      hasArabic: !!course.languages?.ar?.courseName,
-      hasSpanish: !!course.languages?.es?.courseName,
-      pagesCount: {
-        en: course.languages?.en?.pages?.length || 0,
-        hi: course.languages?.hi?.pages?.length || 0,
-        ur: course.languages?.ur?.pages?.length || 0,
-        ar: course.languages?.ar?.pages?.length || 0,
-        es: course.languages?.es?.pages?.length || 0
-      }
-    }));
+    const result = courses.map(course => {
+      // Get all language names
+      const languages = course.languages || {};
+      
+      return {
+        id: course._id,
+        isActive: course.isActive,
+        availableLanguages: course.availableLanguages || [],
+        // All language names
+        englishName: languages.en?.courseName || null,
+        hindiName: languages.hi?.courseName || null,
+        urduName: languages.ur?.courseName || null,
+        arabicName: languages.ar?.courseName || null,
+        spanishName: languages.es?.courseName || null,
+        // All page counts
+        pagesCount: {
+          en: languages.en?.pages?.length || 0,
+          hi: languages.hi?.pages?.length || 0,
+          ur: languages.ur?.pages?.length || 0,
+          ar: languages.ar?.pages?.length || 0,
+          es: languages.es?.pages?.length || 0
+        }
+      };
+    });
     
     console.log(`✅ Found ${courses.length} active courses`);
+    console.log(`📊 Courses with Hindi: ${result.filter(c => c.hindiName).length}`);
+    console.log(`📊 Courses with Urdu: ${result.filter(c => c.urduName).length}`);
+    
     res.json({
       success: true,
       totalActiveCourses: courses.length,
