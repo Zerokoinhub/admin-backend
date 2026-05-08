@@ -797,12 +797,13 @@ exports.getCourses = async (req, res) => {
       error: error.message,
     });
   }
-};exports.getCourseById = async (req, res) => {
+};
+// Admin Backend - Update this function
+exports.getCourseById = async (req, res) => {
   try {
     const { id } = req.params;
-    const { lang = 'en' } = req.query;
 
-    console.log(`📚 Fetching course ${id} in language: ${lang}`);
+    console.log(`📚 Fetching course ${id} with all languages`);
 
     const course = await Course.findById(id)
       .populate('uploadedBy', 'username email');
@@ -814,25 +815,19 @@ exports.getCourses = async (req, res) => {
       });
     }
 
-    // ✅ Get localized content based on requested language
-    const localizedContent = course.getLocalizedContent(lang);
-
-    console.log(`✅ Found course: ${localizedContent.courseName}`);
-    console.log(`📄 Pages: ${localizedContent.pages?.length || 0}`);
-
-    // ✅ Return ONLY the localized content
+    // ✅ Return FULL course with all languages
     res.json({ 
       success: true, 
       course: {
         _id: course._id,
-        courseName: localizedContent.courseName,
-        pages: localizedContent.pages,
-        language: lang,
+        courseName: course.courseName || course.primaryName,
+        languages: course.languages || {},  // ✅ Important: Return all languages
+        pages: course.pages,
+        availableLanguages: course.availableLanguages || [],
         isActive: course.isActive,
         createdAt: course.createdAt,
         updatedAt: course.updatedAt,
-        uploadedBy: course.uploadedBy,
-        availableLanguages: course.availableLanguages || []
+        uploadedBy: course.uploadedBy
       }
     });
   } catch (error) {
@@ -843,8 +838,7 @@ exports.getCourses = async (req, res) => {
       error: error.message,
     });
   }
-};
-// Get courses by language (for Flutter app)
+};// Get courses by language (for Flutter app)
 exports.getCoursesByLanguage = async (req, res) => {
   try {
     const { language } = req.params;
