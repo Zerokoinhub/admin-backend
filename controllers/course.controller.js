@@ -436,9 +436,8 @@ exports.getCourseStructure = async (req, res) => {
 };
 exports.getAllCoursesList = async (req, res) => {
   try {
-    console.log('📚 Fetching ALL courses from database');
+    console.log('📚 Fetching ALL courses from database - WITH ALL LANGUAGES');
     
-    // Don't filter by isActive - get everything
     const courses = await Course.find({})
       .select('_id languages availableLanguages isActive')
       .lean();
@@ -447,15 +446,31 @@ exports.getAllCoursesList = async (req, res) => {
       id: course._id,
       isActive: course.isActive,
       availableLanguages: course.availableLanguages || [],
-      hasEnglish: !!(course.languages?.en?.courseName),
-      hasArabic: !!(course.languages?.ar?.courseName),
-      englishName: course.languages?.en?.courseName || null,
-      arabicName: course.languages?.ar?.courseName || null,
-      englishPages: course.languages?.en?.pages?.length || 0,
-      arabicPages: course.languages?.ar?.pages?.length || 0
+      // ✅ All language names
+      nameInEnglish: course.languages?.en?.courseName || null,
+      nameInHindi: course.languages?.hi?.courseName || null,
+      nameInUrdu: course.languages?.ur?.courseName || null,
+      nameInArabic: course.languages?.ar?.courseName || null,
+      nameInSpanish: course.languages?.es?.courseName || null,
+      // ✅ Pages count
+      pagesInEnglish: course.languages?.en?.pages?.length || 0,
+      pagesInHindi: course.languages?.hi?.pages?.length || 0,
+      pagesInUrdu: course.languages?.ur?.pages?.length || 0,
+      pagesInArabic: course.languages?.ar?.pages?.length || 0,
+      pagesInSpanish: course.languages?.es?.pages?.length || 0,
+      // ✅ Has content flags
+      hasContent: {
+        en: !!course.languages?.en?.courseName,
+        hi: !!course.languages?.hi?.courseName,
+        ur: !!course.languages?.ur?.courseName,
+        ar: !!course.languages?.ar?.courseName,
+        es: !!course.languages?.es?.courseName
+      }
     }));
     
     console.log(`✅ Found ${courses.length} total courses`);
+    console.log(`📊 Hindi content available: ${result.filter(c => c.hasContent.hi).length} courses`);
+    console.log(`📊 Urdu content available: ${result.filter(c => c.hasContent.ur).length} courses`);
     
     res.json({
       success: true,
@@ -472,7 +487,7 @@ exports.getAllCoursesList = async (req, res) => {
 };
 exports.listAllActiveCourses = async (req, res) => {
   try {
-    console.log('📚 Listing all active courses');
+    console.log('📚 Listing all active courses - WITH ALL LANGUAGES');
     
     const courses = await Course.find({ isActive: true })
       .select('_id languages availableLanguages isActive')
@@ -482,15 +497,31 @@ exports.listAllActiveCourses = async (req, res) => {
       id: course._id,
       isActive: course.isActive,
       availableLanguages: course.availableLanguages || [],
+      // ✅ All languages
       englishName: course.languages?.en?.courseName || null,
+      hindiName: course.languages?.hi?.courseName || null,
+      urduName: course.languages?.ur?.courseName || null,
       arabicName: course.languages?.ar?.courseName || null,
+      spanishName: course.languages?.es?.courseName || null,
+      // ✅ Has content flags
       hasEnglish: !!course.languages?.en?.courseName,
+      hasHindi: !!course.languages?.hi?.courseName,
+      hasUrdu: !!course.languages?.ur?.courseName,
       hasArabic: !!course.languages?.ar?.courseName,
+      hasSpanish: !!course.languages?.es?.courseName,
+      // ✅ Pages count for each language
       pagesCount: {
         en: course.languages?.en?.pages?.length || 0,
-        ar: course.languages?.ar?.pages?.length || 0
+        hi: course.languages?.hi?.pages?.length || 0,
+        ur: course.languages?.ur?.pages?.length || 0,
+        ar: course.languages?.ar?.pages?.length || 0,
+        es: course.languages?.es?.pages?.length || 0
       }
     }));
+    
+    console.log(`✅ Found ${courses.length} active courses`);
+    console.log(`📊 Courses with Hindi: ${result.filter(c => c.hasHindi).length}`);
+    console.log(`📊 Courses with Urdu: ${result.filter(c => c.hasUrdu).length}`);
     
     res.json({
       success: true,
@@ -754,9 +785,9 @@ exports.editCourse = async (req, res) => {
 };
 
 // Get all courses
+// Get all courses - WITH ALL LANGUAGES
 exports.getCourses = async (req, res) => {
   try {
-    // ✅ DON'T filter by isActive - get ALL courses
     const courses = await Course.find({})
       .populate('uploadedBy', 'username email')
       .sort('-createdAt');
@@ -766,21 +797,24 @@ exports.getCourses = async (req, res) => {
     const transformedCourses = courses.map(course => {
       const courseObj = course.toObject();
       
-      // Get primary name from first available language
-      let primaryName = 'Untitled';
-      if (courseObj.languages) {
-        const firstLang = Object.keys(courseObj.languages)[0];
-        if (firstLang && courseObj.languages[firstLang]?.courseName) {
-          primaryName = courseObj.languages[firstLang].courseName;
-        }
-      } else if (courseObj.courseName) {
-        primaryName = courseObj.courseName;
-      }
+      // Get names in all languages
+      const languages = {
+        en: courseObj.languages?.en?.courseName || null,
+        hi: courseObj.languages?.hi?.courseName || null,
+        ur: courseObj.languages?.ur?.courseName || null,
+        ar: courseObj.languages?.ar?.courseName || null,
+        es: courseObj.languages?.es?.courseName || null
+      };
+      
+      // Primary name (English or first available)
+      let primaryName = languages.en || languages.hi || languages.ur || languages.ar || languages.es || 'Untitled';
       
       return {
         ...courseObj,
         primaryName: primaryName,
-        languageCount: courseObj.availableLanguages?.length || Object.keys(courseObj.languages || {}).length,
+        languages: languages,
+        availableLanguages: courseObj.availableLanguages || [],
+        languageCount: courseObj.availableLanguages?.length || 0,
         hasMultipleLanguages: (courseObj.availableLanguages?.length || 0) > 1
       };
     });
@@ -797,8 +831,7 @@ exports.getCourses = async (req, res) => {
       error: error.message,
     });
   }
-};
-// Admin Backend - Update this function
+};// Admin Backend - Update this function
 exports.getCourseById = async (req, res) => {
   try {
     const { id } = req.params;
