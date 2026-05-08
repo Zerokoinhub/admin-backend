@@ -15,13 +15,14 @@ const languageContentSchema = new mongoose.Schema({
 const courseSchema = new mongoose.Schema(
   {
     // Store all languages in a single object
+    // ✅ REMOVED: Chinese (zh) and German (de)
+    // ✅ ADDED: Hindi (hi) and Urdu (ur)
     languages: {
-      en: languageContentSchema,
-      es: languageContentSchema,
-      fr: languageContentSchema,
-      de: languageContentSchema,
-      zh: languageContentSchema,
-      ar: languageContentSchema
+      en: languageContentSchema,   // English
+      hi: languageContentSchema,   // Hindi (हिंदी)
+      ur: languageContentSchema,   // Urdu (اردو)
+      ar: languageContentSchema,   // Arabic (العربية)
+      es: languageContentSchema    // Spanish (Español)
     },
     uploadedBy: { 
       type: mongoose.Schema.Types.ObjectId, 
@@ -29,10 +30,10 @@ const courseSchema = new mongoose.Schema(
       required: true 
     },
     isActive: { type: Boolean, default: true },
-    // Optional: Track which languages are available
+    // ✅ Updated: Only these 5 languages
     availableLanguages: [{
       type: String,
-      enum: ['en', 'es', 'fr', 'de', 'zh', 'ar']
+      enum: ['en', 'hi', 'ur', 'ar', 'es']
     }]
   },
   { timestamps: true }
