@@ -704,12 +704,13 @@ exports.uploadCourse = async (req, res) => {
     });
   }
 };// Edit/update an existing course - FIXED: No longer requires English
+// admin-backend/controllers/course.controller.js
+
 exports.editCourse = async (req, res) => {
   try {
     const { id } = req.params;
     const { languages } = req.body;
 
-    // ✅ FIX: Check if at least ONE language has content
     if (!languages || Object.keys(languages).length === 0) {
       return res.status(400).json({
         success: false,
@@ -717,41 +718,7 @@ exports.editCourse = async (req, res) => {
       });
     }
 
-    // Find the existing course first
-    const existingCourse = await Course.findById(id);
-    if (!existingCourse) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Course not found" 
-      });
-    }
-
-    // Merge existing languages with new/updated languages
-    const mergedLanguages = { ...existingCourse.languages.toObject() };
-    
-    // Add/update the provided languages
-    const supportedLanguages = ['en', 'es', 'fr', 'de', 'zh', 'ar', 'hi', 'ur'];
-    supportedLanguages.forEach(lang => {
-      if (languages[lang] && languages[lang].courseName) {
-        mergedLanguages[lang] = languages[lang];
-      }
-    });
-
-    // Filter out empty languages (keep only those with valid course names)
-    const filteredLanguages = {};
-    supportedLanguages.forEach(lang => {
-      if (mergedLanguages[lang] && mergedLanguages[lang].courseName) {
-        filteredLanguages[lang] = mergedLanguages[lang];
-      }
-    });
-
-    // Update the course
-    const course = await Course.findByIdAndUpdate(
-      id,
-      { languages: filteredLanguages },
-      { new: true }
-    ).populate('uploadedBy', 'username email');
-
+    const course = await Course.findById(id);
     if (!course) {
       return res.status(404).json({ 
         success: false, 
@@ -759,10 +726,37 @@ exports.editCourse = async (req, res) => {
       });
     }
 
+    // ✅ Update languages
+    course.languages = languages;
+    
+    // ✅ IMPORTANT: Update availableLanguages from the languages object keys
+    course.availableLanguages = Object.keys(languages).filter(lang => 
+      languages[lang] && languages[lang].courseName && languages[lang].courseName.trim()
+    );
+    
+    // Set primary course name
+    if (languages.en && languages.en.courseName) {
+      course.courseName = languages.en.courseName;
+    } else {
+      const firstLang = Object.keys(languages)[0];
+      if (firstLang && languages[firstLang].courseName) {
+        course.courseName = languages[firstLang].courseName;
+      }
+    }
+    
+    course.updatedAt = new Date();
+    
+    await course.save();
+
     res.json({ 
       success: true, 
       message: "Course updated successfully",
-      course 
+      course: {
+        _id: course._id,
+        courseName: course.courseName,
+        languages: course.languages,
+        availableLanguages: course.availableLanguages
+      }
     });
   } catch (error) {
     console.error("Error editing course:", error);
@@ -772,9 +766,7 @@ exports.editCourse = async (req, res) => {
       error: error.message,
     });
   }
-};
-
-// Get all courses
+};// Get all courses
 // Get all courses - WITH ALL LANGUAGES
 exports.getCourses = async (req, res) => {
   try {
