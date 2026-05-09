@@ -61,11 +61,6 @@ const uploadScreenshotsHandler = async (req, res) => {
 }
 
 // Export both functions
-module.exports = {
-  addScreenshot,
-  uploadScreenshotsHandler,
-  // ... your other exports
-}
 // Sync Firebase user to MongoDB
 const syncFirebaseUser = async (req, res) => {
   try {
