@@ -6,16 +6,14 @@ const cloudinary = require('cloudinary').v2
 const { CloudinaryStorage } = require('multer-storage-cloudinary')
 require('dotenv').config()
 
-console.log('🚀 USER ROUTES FILE LOADED');
-
-// ============ CLOUDINARY CONFIGURATION ============
+// Cloudinary Config
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
-});
+})
 
-// ============ SCREENSHOT UPLOAD STORAGE ============
+// Screenshot Storage
 const screenshotStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -24,244 +22,55 @@ const screenshotStorage = new CloudinaryStorage({
       const ext = file.originalname.split('.').pop().toLowerCase();
       return ext === 'png' ? 'png' : 'jpg';
     },
-    public_id: (req, file) => {
-      const timestamp = Date.now();
-      const random = Math.random().toString(36).substring(2, 10);
-      return `screenshot_${timestamp}_${random}`;
-    }
+    public_id: (req, file) => `screenshot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   }
-});
+})
 
-const uploadScreenshots = multer({ 
-  storage: screenshotStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only JPEG, JPG, PNG images are allowed'), false);
-    }
-  }
-});
+const upload = multer({ storage: screenshotStorage })
 
-// ============ TEST ROUTES ============
-router.get('/test', (req, res) => {
-  console.log('✅ User test route hit');
-  res.json({ success: true, message: 'User routes are working!' });
-});
-
-router.get('/ping', (req, res) => {
-  res.json({ success: true, message: 'User routes ping successful' });
-});
-
-// ============ DEBUG ROUTE ============
-router.get('/debug/all', async (req, res) => {
+// ============ ✅ SCREENSHOT UPLOAD ENDPOINT (YE SABSE IMPORTANT HAI) ============
+router.post('/upload-screenshots', upload.array('screenshots', 10), async (req, res) => {
   try {
-    const User = require("../models/user.model");
-    const users = await User.find({}).select('name email firebaseUid uid balance isActive screenshots');
-    console.log('📊 Debug - Total users in DB:', users.length);
-    res.json({ 
-      success: true, 
-      total: users.length, 
-      users: users 
-    });
+    const { email } = req.body
+    if (!email) return res.status(400).json({ error: 'Email required' })
+    if (!req.files?.length) return res.status(400).json({ error: 'No files' })
+
+    const urls = req.files.map(f => f.path)
+    const User = require("../models/user.model")
+    
+    await User.findOneAndUpdate(
+      { email: email },
+      { $push: { screenshots: { $each: urls } }, $set: { updatedAt: new Date() } }
+    )
+    
+    res.json({ success: true, urls, count: urls.length })
   } catch (error) {
-    console.error('Debug error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: error.message })
   }
-});
+})
 
-// ============ MAIN GET USERS ROUTE ============
-router.get('/', userController.getUsers);
+// ============ ALL OTHER ROUTES ============
+router.get('/', userController.getUsers)
+router.post('/sync', userController.syncFirebaseUser)
+router.get('/leaderboard/top10', userController.getTopBalanceUsers)
+router.get('/leaderboard/rank/:userId', userController.getUserBalanceRank)
+router.get('/leaderboard/all', userController.getLeaderboardPaginated)
+router.get('/stats/overview', userController.getUserStats)
+router.get('/stats/referrals', userController.getTotalReferrals)
+router.get('/stats/wallets', userController.getTotalConnectedWallets)
+router.get('/stats/calculator-usage', userController.getTotalCalculatorUsage)
+router.get('/calculator-users', userController.getCalculatorUsers)
+router.post('/edit-balance', userController.editUserBalance)
+router.get('/:id/sessions', userController.getUserSessions)
+router.put('/:id/sessions', userController.updateUserSession)
+router.put('/:id/notifications', userController.updateNotificationSettings)
+router.post('/:id/fcm-token', userController.addFcmToken)
+router.delete('/:id/fcm-token', userController.removeFcmToken)
+router.get('/:userId/screenshots', userController.getUserScreenshots)
+router.post('/:id/screenshots', userController.addScreenshot)
+router.put('/:id/ban', userController.banUser)
+router.put('/:id/unban', userController.unbanUser)
+router.post('/:id/transfer', userController.manualCoinTransfer)
+router.put('/:id', userController.updateUser)
 
-// ============ SYNC ROUTE ============
-router.post('/sync', userController.syncFirebaseUser);
-
-// ============ LEADERBOARD ROUTES ============
-router.get('/leaderboard/top10', userController.getTopBalanceUsers);
-router.get('/leaderboard/rank/:userId', userController.getUserBalanceRank);
-router.get('/leaderboard/all', userController.getLeaderboardPaginated);
-
-// ============ STATISTICS ROUTES ============
-router.get('/stats/overview', userController.getUserStats);
-router.get('/stats/referrals', userController.getTotalReferrals);
-router.get('/stats/wallets', userController.getTotalConnectedWallets);
-router.get('/stats/calculator-usage', userController.getTotalCalculatorUsage);
-
-// ============ SPECIAL ROUTES ============
-router.get('/calculator-users', userController.getCalculatorUsers);
-router.post('/edit-balance', userController.editUserBalance);
-
-// ============ SESSION ROUTES ============
-router.get('/:id/sessions', userController.getUserSessions);
-router.put('/:id/sessions', userController.updateUserSession);
-
-// ============ NOTIFICATION SETTINGS ============
-router.put('/:id/notifications', userController.updateNotificationSettings);
-
-// ============ FCM TOKEN MANAGEMENT ============
-router.post('/:id/fcm-token', userController.addFcmToken);
-router.delete('/:id/fcm-token', userController.removeFcmToken);
-
-// ============ SCREENSHOT MANAGEMENT ============
-router.get('/:userId/screenshots', userController.getUserScreenshots);
-router.post('/:id/screenshots', userController.addScreenshot);
-
-// ============ ✅ NEW - SCREENSHOT UPLOAD ENDPOINT (MULTIPLE FILES) ============
-router.post('/upload-screenshots', uploadScreenshots.array('screenshots', 10), async (req, res) => {
-  try {
-    console.log('📸 Upload endpoint hit');
-    console.log('Files:', req.files?.length);
-    console.log('Body:', req.body);
-    
-    // Get email from body (mobile app sends email)
-    const { email } = req.body;
-    
-    if (!email) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Email is required' 
-      });
-    }
-    
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'No files uploaded' 
-      });
-    }
-    
-    // Get Cloudinary URLs from uploaded files
-    const screenshotUrls = req.files.map(file => file.path);
-    
-    console.log(`✅ Uploaded ${screenshotUrls.length} screenshots for ${email}`);
-    console.log('URLs:', screenshotUrls);
-    
-    // Find user and update
-    const User = require("../models/user.model");
-    const user = await User.findOne({ email: email });
-    
-    if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'User not found' 
-      });
-    }
-    
-    // Add screenshots to user's array
-    for (const url of screenshotUrls) {
-      user.screenshots.push(url);
-    }
-    user.updatedAt = new Date();
-    await user.save();
-    
-    res.json({
-      success: true,
-      urls: screenshotUrls,
-      count: screenshotUrls.length,
-      message: `${screenshotUrls.length} screenshot(s) uploaded successfully`
-    });
-    
-  } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
-  }
-});
-
-// ============ ✅ NEW - UPDATE SCREENSHOTS (MANUAL ADMIN UPDATE) ============
-router.put('/update-screenshots', async (req, res) => {
-  try {
-    const { email, screenshots } = req.body;
-    
-    if (!email) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Email required' 
-      });
-    }
-    
-    const User = require("../models/user.model");
-    const user = await User.findOne({ email: email });
-    
-    if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'User not found' 
-      });
-    }
-    
-    user.screenshots = screenshots || [];
-    user.updatedAt = new Date();
-    await user.save();
-    
-    res.json({
-      success: true,
-      message: 'Screenshots updated successfully',
-      screenshots: user.screenshots
-    });
-    
-  } catch (error) {
-    console.error('Update error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
-  }
-});
-
-// ============ ✅ NEW - SINGLE SCREENSHOT UPDATE ============
-router.post('/add-screenshot', async (req, res) => {
-  try {
-    const { email, screenshotUrl } = req.body;
-    
-    if (!email || !screenshotUrl) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Email and screenshotUrl required' 
-      });
-    }
-    
-    const User = require("../models/user.model");
-    const user = await User.findOne({ email: email });
-    
-    if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'User not found' 
-      });
-    }
-    
-    user.screenshots.push(screenshotUrl);
-    user.updatedAt = new Date();
-    await user.save();
-    
-    res.json({
-      success: true,
-      message: 'Screenshot added successfully',
-      screenshots: user.screenshots
-    });
-    
-  } catch (error) {
-    console.error('Add screenshot error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
-  }
-});
-
-// ============ USER STATUS MANAGEMENT ============
-router.put('/:id/ban', userController.banUser);
-router.put('/:id/unban', userController.unbanUser);
-
-// ============ COIN TRANSFER ============
-router.post('/:id/transfer', userController.manualCoinTransfer);
-
-// ============ GENERIC USER UPDATE (LAST) ============
-router.put('/:id', userController.updateUser);
-
-module.exports = router;
+module.exports = router
