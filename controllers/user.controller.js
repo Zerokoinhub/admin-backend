@@ -6,6 +6,66 @@ const CACHE_DURATION = 300
 const cache = new Map()
 
 
+const uploadScreenshotsHandler = async (req, res) => {
+  try {
+    const { email } = req.body
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      })
+    }
+    
+    // Files should be uploaded via multer to Cloudinary first
+    // The URLs will be in req.files
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No files uploaded",
+      })
+    }
+    
+    // Extract Cloudinary URLs from uploaded files
+    const screenshotUrls = req.files.map(file => file.path || file.secure_url)
+    
+    // Find user by email
+    const user = await User.findOne({ email: email })
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      })
+    }
+    
+    // Add all screenshot URLs
+    user.screenshots.push(...screenshotUrls)
+    user.updatedAt = new Date()
+    await user.save()
+    
+    res.json({
+      success: true,
+      message: `${screenshotUrls.length} screenshot(s) uploaded successfully`,
+      urls: screenshotUrls,
+      screenshots: user.screenshots,
+    })
+    
+  } catch (error) {
+    console.error('Upload error:', error)
+    res.status(500).json({
+      success: false,
+      message: "Error uploading screenshots",
+      error: error.message,
+    })
+  }
+}
+
+// Export both functions
+module.exports = {
+  addScreenshot,
+  uploadScreenshotsHandler,
+  // ... your other exports
+}
 // Sync Firebase user to MongoDB
 const syncFirebaseUser = async (req, res) => {
   try {
