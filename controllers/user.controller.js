@@ -1259,4 +1259,5 @@ module.exports = {
   updateProfile,
   getProfile,
   changePassword,
+   uploadScreenshotsHandler,
 }
