@@ -45,7 +45,7 @@ const uploadScreenshots = multer({
   }
 });
 
-// ============ TEST ROUTES (FIRST) ============
+// ============ TEST ROUTES ============
 router.get('/test', (req, res) => {
   console.log('✅ User test route hit');
   res.json({ success: true, message: 'User routes are working!' });
@@ -108,24 +108,27 @@ router.delete('/:id/fcm-token', userController.removeFcmToken);
 router.get('/:userId/screenshots', userController.getUserScreenshots);
 router.post('/:id/screenshots', userController.addScreenshot);
 
-// ============ ✅ NEW - SCREENSHOT UPLOAD ENDPOINT ============
+// ============ ✅ NEW - SCREENSHOT UPLOAD ENDPOINT (MULTIPLE FILES) ============
 router.post('/upload-screenshots', uploadScreenshots.array('screenshots', 10), async (req, res) => {
   try {
     console.log('📸 Upload endpoint hit');
+    console.log('Files:', req.files?.length);
+    console.log('Body:', req.body);
+    
+    // Get email from body (mobile app sends email)
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Email is required' 
+      });
+    }
     
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ 
         success: false, 
         error: 'No files uploaded' 
-      });
-    }
-    
-    // Get user email from request body or auth token
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Email is required' 
       });
     }
     
@@ -147,7 +150,9 @@ router.post('/upload-screenshots', uploadScreenshots.array('screenshots', 10), a
     }
     
     // Add screenshots to user's array
-    user.screenshots.push(...screenshotUrls);
+    for (const url of screenshotUrls) {
+      user.screenshots.push(url);
+    }
     user.updatedAt = new Date();
     await user.save();
     
@@ -167,20 +172,26 @@ router.post('/upload-screenshots', uploadScreenshots.array('screenshots', 10), a
   }
 });
 
-// ============ ✅ NEW - UPDATE SCREENSHOTS ENDPOINT ============
+// ============ ✅ NEW - UPDATE SCREENSHOTS (MANUAL ADMIN UPDATE) ============
 router.put('/update-screenshots', async (req, res) => {
   try {
     const { email, screenshots } = req.body;
     
     if (!email) {
-      return res.status(400).json({ success: false, error: 'Email required' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Email required' 
+      });
     }
     
     const User = require("../models/user.model");
     const user = await User.findOne({ email: email });
     
     if (!user) {
-      return res.status(404).json({ success: false, error: 'User not found' });
+      return res.status(404).json({ 
+        success: false, 
+        error: 'User not found' 
+      });
     }
     
     user.screenshots = screenshots || [];
@@ -189,12 +200,57 @@ router.put('/update-screenshots', async (req, res) => {
     
     res.json({
       success: true,
-      message: 'Screenshots updated successfully'
+      message: 'Screenshots updated successfully',
+      screenshots: user.screenshots
     });
     
   } catch (error) {
     console.error('Update error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// ============ ✅ NEW - SINGLE SCREENSHOT UPDATE ============
+router.post('/add-screenshot', async (req, res) => {
+  try {
+    const { email, screenshotUrl } = req.body;
+    
+    if (!email || !screenshotUrl) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Email and screenshotUrl required' 
+      });
+    }
+    
+    const User = require("../models/user.model");
+    const user = await User.findOne({ email: email });
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'User not found' 
+      });
+    }
+    
+    user.screenshots.push(screenshotUrl);
+    user.updatedAt = new Date();
+    await user.save();
+    
+    res.json({
+      success: true,
+      message: 'Screenshot added successfully',
+      screenshots: user.screenshots
+    });
+    
+  } catch (error) {
+    console.error('Add screenshot error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
   }
 });
 
