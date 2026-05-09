@@ -522,15 +522,51 @@ const removeFcmToken = async (req, res) => {
 const addScreenshot = async (req, res) => {
   try {
     const { id } = req.params
-    const { screenshot } = req.body
+    const { screenshot, email } = req.body
 
-    if (!screenshot) {
+    // Accept both formats: direct URL or object with url
+    let screenshotUrl = null
+    
+    if (typeof screenshot === 'string') {
+      // Direct URL from mobile app
+      screenshotUrl = screenshot
+    } else if (screenshot && typeof screenshot === 'object') {
+      // Object format with url property
+      screenshotUrl = screenshot.url || screenshot.imageUrl || null
+    }
+
+    // If no screenshot found in body, check for email-based update
+    if (!screenshotUrl && email) {
+      // This is for admin panel manual updates
+      const user = await User.findOne({ email: email })
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        })
+      }
+      
+      // If screenshots array is provided in body
+      if (req.body.screenshots && Array.isArray(req.body.screenshots)) {
+        user.screenshots = req.body.screenshots
+        await user.save()
+        return res.json({
+          success: true,
+          message: "Screenshots updated successfully",
+          screenshots: user.screenshots,
+        })
+      }
+    }
+
+    // If no valid screenshot URL found
+    if (!screenshotUrl) {
       return res.status(400).json({
         success: false,
-        message: "Screenshot data is required",
+        message: "Screenshot URL is required",
       })
     }
 
+    // Find user by ID
     const user = await User.findById(id)
     if (!user) {
       return res.status(404).json({
@@ -539,13 +575,15 @@ const addScreenshot = async (req, res) => {
       })
     }
 
-    user.screenshots.push({
-      ...screenshot,
-      uploadedAt: new Date(),
-    })
+    // Add screenshot URL to array
+    user.screenshots.push(screenshotUrl)
+    user.updatedAt = new Date()
     await user.save()
 
-    cache.clear()
+    // Clear cache if you have one
+    if (typeof cache !== 'undefined' && cache.clear) {
+      cache.clear()
+    }
 
     res.json({
       success: true,
@@ -553,15 +591,14 @@ const addScreenshot = async (req, res) => {
       screenshots: user.screenshots,
     })
   } catch (error) {
+    console.error('Add screenshot error:', error)
     res.status(500).json({
       success: false,
       message: "Error adding screenshot",
       error: error.message,
     })
   }
-}
-
-// Get user statistics
+}// Get user statistics
 const getUserStats = async (req, res) => {
   try {
     const stats = await User.aggregate([
