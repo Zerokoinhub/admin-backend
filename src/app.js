@@ -22,7 +22,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ============ CORS CONFIGURATION (FIXED) ============
+// ============ CORS CONFIGURATION ============
 const allowedOrigins = [
   "https://admin.zerokoin.com",
   "https://admin-frontend-jet-eta.vercel.app",
@@ -35,13 +35,10 @@ const allowedOrigins = [
   "http://localhost:3002"
 ];
 
-// CORS middleware with full configuration
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps, curl, Postman)
       if (!origin) return callback(null, true);
-      
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
@@ -58,10 +55,8 @@ app.use(
   })
 );
 
-// Handle preflight requests explicitly
 app.options('*', cors());
 
-// Additional CORS headers middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
@@ -70,7 +65,6 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
   res.header('Access-Control-Allow-Credentials', 'true');
-  
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -106,7 +100,6 @@ app.get('/api/test', (req, res) => {
   res.json({ success: true, message: 'API is working properly' });
 });
 
-// CORS test endpoint
 app.get('/api/cors-test', (req, res) => {
   console.log('✅ CORS test from:', req.headers.origin);
   res.json({ 
@@ -127,6 +120,66 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/transfer", transferRoutes);
 app.use("/api/admob", admobRoutes);
 app.use("/api/withdrawals", withdrawalRoutes);
+
+// ============ ✅ NEW - DEDUCT SCREENSHOT COINS ROUTE ============
+app.post('/api/users/deduct-screenshot-coins', async (req, res) => {
+  try {
+    const { email, amount, admin } = req.body;
+    
+    console.log("📤 Deduct request:", { email, amount, admin });
+    
+    if (!email || !amount) {
+      return res.status(400).json({ error: 'Email and amount required' });
+    }
+
+    const User = require('../models/User');
+    const user = await User.findOne({ email: email });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const currentBalance = user.balance || 0;
+    const newBalance = currentBalance - amount;
+    
+    if (newBalance < 0) {
+      return res.status(400).json({ error: 'Insufficient balance' });
+    }
+    
+    // Update balance directly
+    user.balance = newBalance;
+    user.updatedAt = new Date();
+    await user.save();
+    
+    // Try to record transaction (optional)
+    try {
+      const Transfer = require('../models/Transfer');
+      const transfer = new Transfer({
+        email: email,
+        userName: user.name,
+        amount: -amount,
+        adminName: admin || 'System',
+        reason: 'Screenshot approval revoked',
+        status: 'completed',
+        createdAt: new Date()
+      });
+      await transfer.save();
+    } catch (err) {
+      console.log("Transfer record not saved (optional)");
+    }
+
+    console.log("✅ Deduct successful:", { email, newBalance });
+    
+    return res.status(200).json({ 
+      success: true, 
+      newBalance: newBalance,
+      message: `${amount} coins deducted successfully`
+    });
+  } catch (error) {
+    console.error('Error in deduct-screenshot-coins:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
 
 // Health check
 app.get("/health", (req, res) => {
@@ -156,7 +209,7 @@ app.get('/api/users', async (req, res) => {
     const User = require('../models/User');
     
     const users = await User.find({})
-      .select('email name balance isActive role photoURL createdAt')
+      .select('email name balance isActive role photoURL createdAt screenshots screenshotsApproved')
       .skip((parseInt(page) - 1) * parseInt(limit))
       .limit(parseInt(limit))
       .sort({ createdAt: -1 });
@@ -210,6 +263,7 @@ app.listen(PORT, () => {
   console.log(`   GET  /health - Health check`);
   console.log(`   GET  /api/users - Get all users (paginated)`);
   console.log(`   GET  /api/users/all - Get all users`);
+  console.log(`   POST /api/users/deduct-screenshot-coins - Deduct coins for unapprove`);
   console.log(`   GET  /api/courses - Get all courses`);
   console.log(`   POST /api/users/sync - Sync user`);
   console.log(`\n✅ CORS Allowed Origins:`);
