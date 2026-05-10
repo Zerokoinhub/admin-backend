@@ -38,7 +38,7 @@ router.post('/deduct-screenshot-coins', async (req, res) => {
       }
     );
     
-    // Record transaction
+    // Record transaction in transfers collection
     await db.collection('transfers').insertOne({
       email: email,
       userName: user.name,
@@ -57,7 +57,7 @@ router.post('/deduct-screenshot-coins', async (req, res) => {
       message: `${amount} coins deducted successfully`
     });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error in deduct-screenshot-coins:', error);
     return res.status(500).json({ error: error.message });
   }
 });
