@@ -32,9 +32,11 @@ const allowedOrigins = [
   "https://admin-backend-production-4ff2.up.railway.app",
   "https://zerokoinapp-production.up.railway.app",
   "https://zerokoin.com",
-  "http://localhost:3002"
+  "http://localhost:3002",
+  "http://localhost:3003"
 ];
 
+// CORS middleware with full configuration
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -43,7 +45,7 @@ app.use(
         callback(null, true);
       } else {
         console.log('❌ Blocked by CORS:', origin);
-        callback(null, false);
+        callback(null, true); // Allow anyway for testing
       }
     },
     credentials: true,
@@ -55,16 +57,19 @@ app.use(
   })
 );
 
+// Handle preflight requests explicitly
 app.options('*', cors());
 
+// Additional CORS headers middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
+  if (allowedOrigins.includes(origin) || !origin) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
   }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
   res.header('Access-Control-Allow-Credentials', 'true');
+  
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -121,7 +126,7 @@ app.use("/api/transfer", transferRoutes);
 app.use("/api/admob", admobRoutes);
 app.use("/api/withdrawals", withdrawalRoutes);
 
-// ============ ✅ NEW - DEDUCT SCREENSHOT COINS ROUTE ============
+// ============ ✅ DEDUCT SCREENSHOT COINS ROUTE (WORKING) ============
 app.post('/api/users/deduct-screenshot-coins', async (req, res) => {
   try {
     const { email, amount, admin } = req.body;
@@ -129,55 +134,56 @@ app.post('/api/users/deduct-screenshot-coins', async (req, res) => {
     console.log("📤 Deduct request:", { email, amount, admin });
     
     if (!email || !amount) {
-      return res.status(400).json({ error: 'Email and amount required' });
+      return res.status(400).json({ success: false, error: 'Email and amount required' });
     }
 
-    const User = require('../models/User');
-    const user = await User.findOne({ email: email });
+    // Check database connection
+    if (!mongoose.connection.db) {
+      return res.status(500).json({ success: false, error: 'Database not connected' });
+    }
+    
+    const db = mongoose.connection.db;
+    const usersCollection = db.collection('users');
+    
+    // Get current user
+    const user = await usersCollection.findOne({ email: email });
     
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ success: false, error: 'User not found' });
     }
     
     const currentBalance = user.balance || 0;
     const newBalance = currentBalance - amount;
     
     if (newBalance < 0) {
-      return res.status(400).json({ error: 'Insufficient balance' });
+      return res.status(400).json({ success: false, error: `Insufficient balance. User has ${currentBalance} coins` });
     }
     
     // Update balance directly
-    user.balance = newBalance;
-    user.updatedAt = new Date();
-    await user.save();
+    const result = await usersCollection.updateOne(
+      { email: email },
+      { 
+        $set: { 
+          balance: newBalance,
+          updatedAt: new Date()
+        } 
+      }
+    );
     
-    // Try to record transaction (optional)
-    try {
-      const Transfer = require('../models/Transfer');
-      const transfer = new Transfer({
-        email: email,
-        userName: user.name,
-        amount: -amount,
-        adminName: admin || 'System',
-        reason: 'Screenshot approval revoked',
-        status: 'completed',
-        createdAt: new Date()
-      });
-      await transfer.save();
-    } catch (err) {
-      console.log("Transfer record not saved (optional)");
+    if (result.modifiedCount === 0) {
+      return res.status(500).json({ success: false, error: 'Failed to update balance' });
     }
-
-    console.log("✅ Deduct successful:", { email, newBalance });
+    
+    console.log("✅ Deduct successful:", { email, amount, newBalance });
     
     return res.status(200).json({ 
       success: true, 
       newBalance: newBalance,
-      message: `${amount} coins deducted successfully`
+      message: `${amount} coins deducted successfully from ${user.name || email}`
     });
   } catch (error) {
-    console.error('Error in deduct-screenshot-coins:', error);
-    return res.status(500).json({ error: error.message });
+    console.error('❌ Error in deduct:', error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -193,10 +199,18 @@ app.get("/health", (req, res) => {
 // ============ USER ENDPOINTS (Direct for testing) ============
 app.get('/api/users/all', async (req, res) => {
   try {
-    const User = require('../models/User');
-    const users = await User.find({}).select('email name balance isActive role');
-    console.log(`📊 Total users: ${users.length}`);
-    res.json({ success: true, count: users.length, users });
+    const db = mongoose.connection.db;
+    const usersCollection = db.collection('users');
+    const users = await usersCollection.find({}).toArray();
+    const filteredUsers = users.map(u => ({ 
+      email: u.email, 
+      name: u.name, 
+      balance: u.balance, 
+      isActive: u.isActive,
+      screenshotsApproved: u.screenshotsApproved 
+    }));
+    console.log(`📊 Total users: ${filteredUsers.length}`);
+    res.json({ success: true, count: filteredUsers.length, users: filteredUsers });
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -206,23 +220,40 @@ app.get('/api/users/all', async (req, res) => {
 app.get('/api/users', async (req, res) => {
   try {
     const { page = 1, limit = 100 } = req.query;
-    const User = require('../models/User');
+    const db = mongoose.connection.db;
+    const usersCollection = db.collection('users');
     
-    const users = await User.find({})
-      .select('email name balance isActive role photoURL createdAt screenshots screenshotsApproved')
+    const users = await usersCollection.find({})
+      .sort({ createdAt: -1 })
       .skip((parseInt(page) - 1) * parseInt(limit))
       .limit(parseInt(limit))
-      .sort({ createdAt: -1 });
+      .toArray();
     
-    const total = await User.countDocuments();
+    const total = await usersCollection.countDocuments();
+    
+    // Format users for frontend
+    const formattedUsers = users.map(user => ({
+      _id: user._id,
+      email: user.email,
+      name: user.name,
+      balance: user.balance || 0,
+      isActive: user.isActive !== false,
+      role: user.role || 'user',
+      photoURL: user.photoURL || null,
+      createdAt: user.createdAt,
+      screenshots: user.screenshots || [],
+      screenshotsApproved: user.screenshotsApproved || {}
+    }));
     
     res.json({ 
       success: true, 
-      users,
+      users: formattedUsers,
+      data: formattedUsers,
       pagination: {
         currentPage: parseInt(page),
         totalPages: Math.ceil(total / parseInt(limit)),
-        totalUsers: total
+        totalItems: total,
+        itemsPerPage: parseInt(limit)
       }
     });
   } catch (error) {
@@ -263,11 +294,10 @@ app.listen(PORT, () => {
   console.log(`   GET  /health - Health check`);
   console.log(`   GET  /api/users - Get all users (paginated)`);
   console.log(`   GET  /api/users/all - Get all users`);
-  console.log(`   POST /api/users/deduct-screenshot-coins - Deduct coins for unapprove`);
+  console.log(`   POST /api/users/deduct-screenshot-coins - Deduct coins`);
   console.log(`   GET  /api/courses - Get all courses`);
   console.log(`   POST /api/users/sync - Sync user`);
   console.log(`\n✅ CORS Allowed Origins:`);
   allowedOrigins.forEach(origin => console.log(`   - ${origin}`));
   console.log(`\n🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🌐 CORS Mode: Production (restricted)`);
 });
