@@ -1082,12 +1082,11 @@ const getTopBalanceUsers = async (req, res) => {
   try {
     console.log('📊 Fetching top users by balance...');
 
-    // ✅ Add photoURL to select
     const topUsers = await User.find({ 
       isActive: true,
       balance: { $gt: 0 }
     })
-    .select('name username email balance photoURL profilePicture country') // ✅ Added photoURL
+    .select('name username email balance photoURL profilePicture country')
     .sort({ balance: -1 })
     .limit(10)
     .lean();
@@ -1098,21 +1097,25 @@ const getTopBalanceUsers = async (req, res) => {
       name: user.name || user.username || 'Anonymous User',
       email: user.email,
       balance: user.balance || 0,
-      photoURL: user.photoURL || null,  // ✅ Add this
+      photoURL: user.photoURL || null,
       profilePicture: user.photoURL || user.profilePicture || null,
       country: user.country || 'Unknown',
     }));
 
-    // Also get users with photos count for debugging
-    const usersWithPhotos = formattedUsers.filter(u => u.photoURL).length;
-    console.log(`📸 Users with profile pictures: ${usersWithPhotos}`);
+    const totalActiveUsers = await User.countDocuments({ 
+      isActive: true,
+      balance: { $gt: 0 }
+    });
+
+    console.log(`✅ Top ${formattedUsers.length} users fetched`);
+    console.log(`📸 Users with photos: ${formattedUsers.filter(u => u.photoURL).length}`);
 
     res.json({
       success: true,
       data: {
         topUsers: formattedUsers,
         stats: {
-          totalUsersWithBalance: await User.countDocuments({ isActive: true, balance: { $gt: 0 } }),
+          totalUsersWithBalance: totalActiveUsers,
           highestBalance: formattedUsers[0]?.balance || 0,
           lastUpdated: new Date().toISOString()
         }
