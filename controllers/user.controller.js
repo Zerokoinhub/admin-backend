@@ -5,7 +5,51 @@ const { recordTransfer } = require("./transfer.controller")
 const CACHE_DURATION = 300
 const cache = new Map()
 
-
+const updateUserPhoto = async (req, res) => {
+  try {
+    const { email, photoURL } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+    
+    const user = await User.findOne({ email: email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+    
+    user.photoURL = photoURL;
+    user.updatedAt = new Date();
+    await user.save();
+    
+    cache.clear();
+    
+    res.json({
+      success: true,
+      message: "Profile picture updated successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        photoURL: user.photoURL
+      }
+    });
+    
+  } catch (error) {
+    console.error("Error updating user photo:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error updating profile picture",
+      error: error.message
+    });
+  }
+};
 const uploadScreenshotsHandler = async (req, res) => {
   try {
     const { email } = req.body
