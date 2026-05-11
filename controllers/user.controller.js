@@ -1080,41 +1080,44 @@ const changePassword = async (req, res) => {
 // Get top 10 users by balance for leaderboard
 const getTopBalanceUsers = async (req, res) => {
   try {
-    console.log('📊 Fetching top users by balance...');
+    console.log('📊 Fetching ALL users by balance...');
 
-    // ✅ FORCE REFRESH - No cache
-    const topUsers = await User.find({ 
-      
-      balance: { $gt: 0 }
-    })
-    .select('name username email balance photoURL profilePicture country sessions completedSessionsCount')
-    .sort({ balance: -1 })
-    .limit(10)
-    .lean();
+    // ✅ Get ALL users, no filters
+    const allUsers = await User.find({})
+      .select('name username email balance photoURL profilePicture country')
+      .sort({ balance: -1 })  // Highest to lowest
+      .lean();
 
-    const formattedUsers = topUsers.map((user, index) => {
-      // Get latest balance
-      const currentBalance = user.balance || 0;
-      
-      return {
-        rank: index + 1,
-        id: user._id,
-        name: user.name || user.username || 'Anonymous User',
-        email: user.email,
-        balance: currentBalance,  // ✅ Latest balance
-        photoURL: user.photoURL || null,
-        profilePicture: user.photoURL || user.profilePicture || null,
-        country: user.country || 'Unknown',
-        sessionsCompleted: user.completedSessionsCount || 0,
-      };
+    console.log(`✅ Total users found: ${allUsers.length}`);
+    
+    // Debug: Print all balances
+    console.log('📊 All user balances:');
+    allUsers.forEach((user, i) => {
+      console.log(`${i+1}. ${user.name} - Balance: ${user.balance} (Type: ${typeof user.balance})`);
     });
+
+    // Take top 10
+    const topUsers = allUsers.slice(0, 10);
+
+    const formattedUsers = topUsers.map((user, index) => ({
+      rank: index + 1,
+      id: user._id,
+      name: user.name || user.username || 'Anonymous User',
+      email: user.email,
+      balance: Number(user.balance) || 0,  // ✅ Ensure numeric
+      photoURL: user.photoURL || null,
+      profilePicture: user.photoURL || user.profilePicture || null,
+      country: user.country || 'Unknown',
+    }));
+
+    console.log(`🏆 Top user: ${formattedUsers[0]?.name} with ${formattedUsers[0]?.balance} coins`);
 
     res.json({
       success: true,
       data: {
         topUsers: formattedUsers,
         stats: {
-          totalUsersWithBalance: await User.countDocuments({ isActive: true, balance: { $gt: 0 } }),
+          totalUsersWithBalance: allUsers.filter(u => (u.balance || 0) > 0).length,
           highestBalance: formattedUsers[0]?.balance || 0,
           lastUpdated: new Date().toISOString()
         }
