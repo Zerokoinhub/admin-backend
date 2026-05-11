@@ -51,6 +51,8 @@ router.post('/upload-screenshots', upload.array('screenshots', 10), async (req, 
 
 // ============ ALL OTHER ROUTES ============
 router.get('/', userController.getUsers)
+// Add this route
+router.post('/update-photo', userController.updateUserPhoto);
 router.post('/sync', userController.syncFirebaseUser)
 router.get('/leaderboard/top10', userController.getTopBalanceUsers)
 router.get('/leaderboard/rank/:userId', userController.getUserBalanceRank)
