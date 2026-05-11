@@ -174,15 +174,12 @@ const ensureUserSessions = async (userId) => {
 const getUsers = async (req, res) => {
   try {
     console.log('📡 GET USERS API CALLED');
-    console.log('Query params:', req.query);
     
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 100; // Increased limit to get all users
+    const limit = parseInt(req.query.limit) || 100;
     const search = req.query.search || "";
     
-    // Build query
     let query = {};
-    
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: "i" } },
@@ -190,11 +187,8 @@ const getUsers = async (req, res) => {
       ];
     }
     
-    console.log('Query:', JSON.stringify(query));
-    
     const skip = (page - 1) * limit;
     
-    // Get users
     const users = await User.find(query)
       .select('-password')
       .sort({ createdAt: -1 })
@@ -204,14 +198,17 @@ const getUsers = async (req, res) => {
     
     const total = await User.countDocuments(query);
     
-    console.log(`✅ Found ${users.length} users out of ${total} total`);
-    console.log('First few users:', users.slice(0, 3).map(u => ({ name: u.name, email: u.email })));
+    // ✅ Add photoURL to response
+    const usersWithPhoto = users.map(user => ({
+      ...user,
+      photoURL: user.photoURL || null,
+      profilePicture: user.photoURL || user.profilePicture || null,
+    }));
     
-    // Return in the format frontend expects
     res.json({
       success: true,
-      users: users,  // Direct array
-      data: users,   // Alternative format
+      users: usersWithPhoto,
+      data: usersWithPhoto,
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(total / limit),
@@ -228,7 +225,7 @@ const getUsers = async (req, res) => {
       error: error.message
     });
   }
-};// Update user - handles all editable fields from frontend
+};
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params
@@ -1024,6 +1021,8 @@ const changePassword = async (req, res) => {
   }
 }
 // Get top 10 users by balance for leaderboard
+
+// Get top 10 users by balance for leaderboard
 const getTopBalanceUsers = async (req, res) => {
   try {
     const cacheKey = 'top_balance_users_10'
@@ -1044,22 +1043,23 @@ const getTopBalanceUsers = async (req, res) => {
 
     // Get top 10 users by balance (descending order)
     const topUsers = await User.find({ 
-      isActive: true, // Only active users
-      balance: { $gt: 0 } // Only users with positive balance
+      isActive: true,
+      balance: { $gt: 0 }
     })
-    .select('name username email balance profilePicture country') // Select only needed fields
-    .sort({ balance: -1 }) // Sort by balance descending
+    .select('name username email balance profilePicture photoURL country') // ✅ Added photoURL
+    .sort({ balance: -1 })
     .limit(10)
     .lean()
 
-    // Format the data for frontend
+    // Format the data for frontend - ✅ Include photoURL
     const formattedUsers = topUsers.map((user, index) => ({
       rank: index + 1,
       id: user._id,
       name: user.name || user.username || 'Anonymous User',
       email: user.email,
       balance: user.balance || 0,
-      profilePicture: user.profilePicture || null,
+      profilePicture: user.photoURL || user.profilePicture || null, // ✅ Use photoURL first
+      photoURL: user.photoURL || user.profilePicture || null, // ✅ Add photoURL field
       country: user.country || 'Unknown',
       username: user.username || '',
     }))
@@ -1094,6 +1094,8 @@ const getTopBalanceUsers = async (req, res) => {
     })
 
     console.log('✅ Top 10 users by balance fetched successfully')
+    console.log(`📸 Users with photos: ${formattedUsers.filter(u => u.photoURL).length}`)
+    
     res.json({
       success: true,
       data: responseData,
@@ -1109,7 +1111,6 @@ const getTopBalanceUsers = async (req, res) => {
     })
   }
 }
-
 // Get user's rank by balance (if not in top 10)
 const getUserBalanceRank = async (req, res) => {
   try {
