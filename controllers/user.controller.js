@@ -1279,6 +1279,7 @@ module.exports = {
   getUserBalanceRank,
   getLeaderboardPaginated,
   getUsers,
+  updateUserPhoto,
   updateUser,
   updateUserSession,
   getUserSessions,
