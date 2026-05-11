@@ -1080,92 +1080,50 @@ const changePassword = async (req, res) => {
 // Get top 10 users by balance for leaderboard
 const getTopBalanceUsers = async (req, res) => {
   try {
-    const cacheKey = 'top_balance_users_10'
-    
-    // Check cache first
-    if (cache.has(cacheKey)) {
-      const cachedData = cache.get(cacheKey)
-      if (Date.now() - cachedData.timestamp < CACHE_DURATION * 1000) {
-        console.log('✅ Returning cached leaderboard data')
-        return res.json({
-          success: true,
-          data: cachedData.data,
-          fromCache: true
-        })
-      }
-      cache.delete(cacheKey)
-    }
+    console.log('📊 Fetching top users by balance...');
 
-    // Get top 10 users by balance (descending order)
+    // ✅ Add photoURL to select
     const topUsers = await User.find({ 
       isActive: true,
       balance: { $gt: 0 }
     })
-    .select('name username email balance profilePicture photoURL country') // ✅ Added photoURL
+    .select('name username email balance photoURL profilePicture country') // ✅ Added photoURL
     .sort({ balance: -1 })
     .limit(10)
-    .lean()
+    .lean();
 
-    // Format the data for frontend - ✅ Include photoURL
     const formattedUsers = topUsers.map((user, index) => ({
       rank: index + 1,
       id: user._id,
       name: user.name || user.username || 'Anonymous User',
       email: user.email,
       balance: user.balance || 0,
-      profilePicture: user.photoURL || user.profilePicture || null, // ✅ Use photoURL first
-      photoURL: user.photoURL || user.profilePicture || null, // ✅ Add photoURL field
+      photoURL: user.photoURL || null,  // ✅ Add this
+      profilePicture: user.photoURL || user.profilePicture || null,
       country: user.country || 'Unknown',
-      username: user.username || '',
-    }))
+    }));
 
-    // Get total count of users with balance > 0 (for stats)
-    const totalActiveUsers = await User.countDocuments({ 
-      isActive: true,
-      balance: { $gt: 0 }
-    })
+    // Also get users with photos count for debugging
+    const usersWithPhotos = formattedUsers.filter(u => u.photoURL).length;
+    console.log(`📸 Users with profile pictures: ${usersWithPhotos}`);
 
-    // Get average balance
-    const avgBalanceResult = await User.aggregate([
-      { $match: { isActive: true, balance: { $gt: 0 } } },
-      { $group: { _id: null, avgBalance: { $avg: "$balance" } } }
-    ])
-    const avgBalance = avgBalanceResult[0]?.avgBalance || 0
-
-    const responseData = {
-      topUsers: formattedUsers,
-      stats: {
-        totalUsersWithBalance: totalActiveUsers,
-        averageBalance: Math.round(avgBalance * 100) / 100,
-        highestBalance: formattedUsers[0]?.balance || 0,
-        lastUpdated: new Date().toISOString()
-      }
-    }
-
-    // Store in cache
-    cache.set(cacheKey, {
-      data: responseData,
-      timestamp: Date.now()
-    })
-
-    console.log('✅ Top 10 users by balance fetched successfully')
-    console.log(`📸 Users with photos: ${formattedUsers.filter(u => u.photoURL).length}`)
-    
     res.json({
       success: true,
-      data: responseData,
-      fromCache: false
-    })
+      data: {
+        topUsers: formattedUsers,
+        stats: {
+          totalUsersWithBalance: await User.countDocuments({ isActive: true, balance: { $gt: 0 } }),
+          highestBalance: formattedUsers[0]?.balance || 0,
+          lastUpdated: new Date().toISOString()
+        }
+      }
+    });
 
   } catch (error) {
-    console.error('❌ Error in getTopBalanceUsers:', error)
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching top balance users',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    })
+    console.error('❌ Error in getTopBalanceUsers:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
-}
+};
 // Get user's rank by balance (if not in top 10)
 const getUserBalanceRank = async (req, res) => {
   try {
