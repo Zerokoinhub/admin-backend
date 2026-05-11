@@ -1084,7 +1084,7 @@ const getTopBalanceUsers = async (req, res) => {
 
     // ✅ FORCE REFRESH - No cache
     const topUsers = await User.find({ 
-      isActive: true,
+      
       balance: { $gt: 0 }
     })
     .select('name username email balance photoURL profilePicture country sessions completedSessionsCount')
